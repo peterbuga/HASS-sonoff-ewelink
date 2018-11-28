@@ -8,8 +8,9 @@ To setup add to your configuration.yaml:
 sonoff:
   email: [registered email]
   password: [password]
-  #apihost: 'eu-api.coolkit.cc'
-  #wshost: 'eu-long.coolkit.cc'
+  scan_interval: 60 (optional)
+  grace_period: 600 (optional)
+  apihost: 'eu-api.coolkit.cc' (optional*)
 ```
 And copy the *.py files in `custom_components` folder using the same structure like defined here:
 ```
@@ -19,13 +20,11 @@ And copy the *.py files in `custom_components` folder using the same structure l
         └── sonoff.py
 ```
 
-For now the devices will be registered in HA under this format `switch.sonoff_1000xxxxxx` to avoid human name conflicting with other possible already present switches *(might change in the future)*.
+`scan_interval` you can define how fast the state of devices is refreshed (by default every 60sec).  for example if you change the switch from an external source like Alexa or Google Home  the change will show up in HA in maximum less than specified period, while changing it using HA interface/actions/etc it's instantly.
+`grace_period` eWeLink app allows **only one active session at a time**, therefore this will temporarily block HA refreshes for the specified amount (in seconds) to allow (or better said **after**) you to login in the app and do required changes to your devices. following that sonoff component does an internal re-login invalidating the mobile session and the process restarts.
+`apihost` this component tries to find & connect to the proper region assigned to you, *only fill this section if you know how to fetch the mobile app requests using Charles Proxy or other utilities alike. possible values that were tested and work are _us-api.coolkit.cc_ or _eu-api.coolkit.cc_, setting this right will save some extra requests when the HA boots up (i.e. making it a bit faster)
 
-**Notice:** the refresh state of devices is setup to every 60sec if for example you change the switch from an external source like Alexa or Google Home , changing it from HA interface it's instantly.
-
-The `apihost` and `wshost` are optional and they work if you live in Europe, try to replace **eu** with **us** and might work if you live in USA, I'm not sure about the other values for other regions (I didn't had the time *or need for that matter* to test & find available endpoints).
-
-Due to the way eWeLink app works, it allows you to have only 1 active session using the same credentials specified above, meaning you'll be all the time kicked out of the app while this component is active/running. (i might add an option later to pause the HA refresh of Sonoff devices while you might need to use the app like setting timers/a new device/etc)
+For now the devices will be registered in HA under this format `switch.sonoff_[sonoff device id]` to avoid human name conflicting with other possible already present switches *(this might change in the future or an option will be added to select a desired naming scheme)*.
 
 This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (althought I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
 
