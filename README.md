@@ -21,7 +21,9 @@ And copy the *.py files in `custom_components` folder using the same structure l
 ```
 
 `scan_interval` you can define how fast the state of devices is refreshed (by default every 60sec).  for example if you change the switch from an external source like Alexa or Google Home  the change will show up in HA in maximum less than specified period, while changing it using HA interface/actions/etc it's instantly.
+
 `grace_period` eWeLink app allows **only one active session at a time**, therefore this will temporarily block HA refreshes for the specified amount (in seconds) to allow (or better said **after**) you to login in the app and do required changes to your devices. following that sonoff component does an internal re-login invalidating the mobile session and the process restarts.
+
 `apihost` this component tries to find & connect to the proper region assigned to you, *only fill this section if you know how to fetch the mobile app requests using Charles Proxy or other utilities alike. possible values that were tested and work are _us-api.coolkit.cc_ or _eu-api.coolkit.cc_, setting this right will save some extra requests when the HA boots up (i.e. making it a bit faster)
 
 For now the devices will be registered in HA under this format `switch.sonoff_[sonoff device id]` to avoid human name conflicting with other possible already present switches *(this might change in the future or an option will be added to select a desired naming scheme)*.
