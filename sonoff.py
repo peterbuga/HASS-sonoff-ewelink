@@ -2,18 +2,21 @@
 import logging, time, hmac, hashlib, random, base64, json, socket, requests
 import voluptuous as vol
 
-# from homeassistant.components.switch import SwitchDevice
 from datetime import timedelta
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util.async_ import run_coroutine_threadsafe
 from homeassistant.helpers import discovery
 from homeassistant.helpers import config_validation as cv
-from homeassistant.const import (EVENT_HOMEASSISTANT_STOP, CONF_SCAN_INTERVAL, CONF_EMAIL, CONF_PASSWORD)
+from homeassistant.const import (
+    EVENT_HOMEASSISTANT_STOP, CONF_SCAN_INTERVAL,
+    CONF_EMAIL, CONF_PASSWORD,
+    HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED)
 # from homeassistant.util import Throttle
 
-CONF_WSHOST     = 'wshost'
-CONF_APIHOST    = 'apihost'
+# CONF_WSHOST         = 'wshost'
+CONF_APIHOST        = 'apihost'
+CONF_GRACE_PERIOD   = 'grace_period'
 
 SCAN_INTERVAL = timedelta(seconds=60)
 DOMAIN = "sonoff"
@@ -27,8 +30,9 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Required(CONF_EMAIL): cv.string,
         vol.Required(CONF_PASSWORD): cv.string,
         vol.Optional(CONF_APIHOST, default='eu-api.coolkit.cc'): cv.string,
-        vol.Optional(CONF_WSHOST, default='eu-long.coolkit.cc'): cv.string,
+        # vol.Optional(CONF_WSHOST, default='us-long.coolkit.cc'): cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
+        vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
     }),
 }, extra=vol.ALLOW_EXTRA)
 
@@ -40,14 +44,17 @@ async def async_setup(hass, config):
     """Set up the eWelink/Sonoff component."""
     
     # get email & password from configuration.yaml
-    email       = config.get(DOMAIN, {}).get(CONF_EMAIL,'')
-    password    = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
-    apihost     = config.get(DOMAIN, {}).get(CONF_APIHOST,'')
-    wshost      = config.get(DOMAIN, {}).get(CONF_WSHOST,'')
+    email           = config.get(DOMAIN, {}).get(CONF_EMAIL,'')
+    password        = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
+    apihost         = config.get(DOMAIN, {}).get(CONF_APIHOST,'')
+    # wshost          = config.get(DOMAIN, {}).get(CONF_WSHOST,'')
+    grace_period    = config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,'')
+
+    SCAN_INTERVAL   = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL,'')
 
     _LOGGER.debug("Create Sonoff object")
 
-    hass.data[DOMAIN] = Sonoff(hass, email, password, apihost, wshost)
+    hass.data[DOMAIN] = Sonoff(hass, email, password, apihost, grace_period)
 
     for component in ['switch']:
         discovery.load_platform(hass, component, DOMAIN, {}, config)
@@ -57,7 +64,7 @@ async def async_setup(hass, config):
 
     def update_devices(event_time):
         """Refresh"""     
-        _LOGGER.debug("Updating main Sonoff...")
+        _LOGGER.info("Updating Sonoff devices status")
 
         # @REMINDER figure it out how this works exactly
         run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
@@ -67,12 +74,16 @@ async def async_setup(hass, config):
     return True
 
 class Sonoff():
-    def __init__(self, hass, email, password, apihost, wshost):
-        self._hass      = hass
-        self._email     = email
-        self._password  = password
-        self._apihost   = apihost
-        self._wshost    = wshost
+    def __init__(self, hass, email, password, apihost, grace_period):
+        self._hass          = hass
+        self._email         = email
+        self._password      = password
+        self._apihost       = apihost
+        self._wshost        = None
+        self._region        = apihost.split('-')[0]
+
+        self._skipped_login = 0
+        self._grace_period  = timedelta(seconds=grace_period)
 
         self._devices   = []
         self._ws        = None
@@ -82,7 +93,8 @@ class Sonoff():
     def do_login(self):
         import uuid
 
-        # @TODO add a fallback for other login regions too
+        # reset the grace period
+        self._skipped_login = 0
         
         app_details = {
             'email'     : self._email,
@@ -109,28 +121,73 @@ class Sonoff():
 
         self._headers = {
             'Authorization' : 'Sign ' + sign,
-            'Content-Type'  : 'application/json'
+            'Content-Type'  : 'application/json;charset=UTF-8'
         }
 
         r = requests.post('https://{}:8080/api/user/login'.format(self._apihost), 
             headers=self._headers, json=app_details)
-        
-        self._bearer_token  = r.json()['at']
-        self._apikey        = r.json()['user']['apikey']
-        self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
 
-        self.update_devices() # to write the devices list 
+        resp = r.json()
+
+        # get a new region to login
+        if 'error' in resp and 'region' in resp and resp['error'] == HTTP_MOVED_PERMANENTLY:
+            self._apihost   = self._apihost.replace(self._region+'-', resp['region']+'-')
+            self._region    = resp['region']
+            self._wshost    = None
+
+            _LOGGER.debug("got new region: %s", self._region)
+
+            # re-login using the new localized endpoint
+            self.do_login()
+
+        else:
+            self._bearer_token  = resp['at']
+            self._apikey        = resp['user']['apikey']
+            self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
+
+            self.update_devices() # to write the devices list 
+
+            # get the websocket host
+            if not self._wshost:
+                self.set_wshost()
+
+    def set_wshost(self):
+        r = requests.post('https://%s-disp.coolkit.cc:8080/dispatch/app' % self._region, headers=self._headers)
+        resp = r.json()
+
+        if 'error' in resp and resp['error'] == 0 and 'domain' in resp:
+            self._wshost = resp['domain']
+            _LOGGER.info("Found sonoff websocket address: %s", self._wshost)
+        else:
+            raise Exception('No websocket domain')
+
+    def is_grace_period(self):
+        grace_time_elapsed = self._skipped_login * int(SCAN_INTERVAL.total_seconds()) 
+        grace_status = grace_time_elapsed < int(self._grace_period.total_seconds())
+
+        if grace_status:
+            self._skipped_login += 1
+
+        return grace_status
 
     def update_devices(self):
+        # we are in the grace period, no updates to the devices
+        if self._skipped_login and self.is_grace_period():          
+            _LOGGER.info("Grace period active")            
+            return self._devices
+
         r = requests.get('https://{}:8080/api/user/device'.format(self._apihost), 
             headers=self._headers)
 
         self._devices = r.json()
 
-        if 'error' in self._devices and self._devices['error'] in [400, 401]:
-            _LOGGER.warning("re-login")
-            # @TODO maybe add a grace period before re-login to allow the user to make real life app changes 
-            # (mabe even add a service call / switch to deactivate sonoff component) 
+        if 'error' in self._devices and self._devices['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED]:
+            # @IMPROVE add maybe a service call / switch to deactivate sonoff component
+            if self.is_grace_period():
+                _LOGGER.warning("Grace period activated!")
+                return self._devices
+
+            _LOGGER.warning("Re-login sonoff component")
             self.do_login()
 
         return self._devices
@@ -191,6 +248,12 @@ class Sonoff():
         
     def switch(self, deviceid, newstate):
         """Switch on or off."""
+
+        # we're in the grace period, no state change
+        if self._skipped_login:
+            _LOGGER.info("Grace period, no state change")
+            return (not newstate)
+
         self._ws = self._get_ws()
 
         _LOGGER.debug("Switching `%s` to state: %s", deviceid, newstate)
