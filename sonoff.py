@@ -335,7 +335,8 @@ class SonoffDevice(Entity):
 
         self._attributes    = {
             'device_name'   : self._device_name,
-            'device_id'     : self._deviceid
+            'device_id'     : self._deviceid,
+            'friendly_name' : self._device_name
         }
 
     def get_device(self, deviceid):
