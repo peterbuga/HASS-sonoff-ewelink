@@ -52,7 +52,7 @@ async def async_setup(hass, config):
 
     SCAN_INTERVAL   = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL,'')
 
-    _LOGGER.debug("Create Sonoff object")
+    _LOGGER.debug("Create the main object")
 
     hass.data[DOMAIN] = Sonoff(hass, email, password, apihost, grace_period)
 
@@ -64,7 +64,7 @@ async def async_setup(hass, config):
 
     def update_devices(event_time):
         """Refresh"""     
-        _LOGGER.info("Updating Sonoff devices status")
+        _LOGGER.info("Updating devices status")
 
         # @REMINDER figure it out how this works exactly
         run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
@@ -85,8 +85,9 @@ class Sonoff():
         self._skipped_login = 0
         self._grace_period  = timedelta(seconds=grace_period)
 
-        self._devices   = []
-        self._ws        = None
+        self._user_apikey   = None
+        self._devices       = []
+        self._ws            = None
 
         self.do_login()
 
@@ -142,7 +143,7 @@ class Sonoff():
 
         else:
             self._bearer_token  = resp['at']
-            self._apikey        = resp['user']['apikey']
+            self._user_apikey   = resp['user']['apikey']
             self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
 
             self.update_devices() # to write the devices list 
@@ -157,7 +158,7 @@ class Sonoff():
 
         if 'error' in resp and resp['error'] == 0 and 'domain' in resp:
             self._wshost = resp['domain']
-            _LOGGER.info("Found sonoff websocket address: %s", self._wshost)
+            _LOGGER.info("Found websocket address: %s", self._wshost)
         else:
             raise Exception('No websocket domain')
 
@@ -187,7 +188,7 @@ class Sonoff():
                 _LOGGER.warning("Grace period activated!")
                 return self._devices
 
-            _LOGGER.warning("Re-login sonoff component")
+            _LOGGER.warning("Re-login component")
             self.do_login()
 
         return self._devices
@@ -198,11 +199,16 @@ class Sonoff():
 
         return self._devices
 
+    def get_device(self, deviceid):
+        for device in self.get_devices():
+            if 'deviceid' in device and device['deviceid'] == deviceid:
+                return device
+
     def get_bearer_token(self):
         return self._bearer_token
 
-    def get_apikey(self):
-        return self._apikey
+    def get_user_apikey(self):
+        return self._user_apikey
 
     # async def async_get_devices(self):
     #     return self.get_devices()
@@ -220,7 +226,7 @@ class Sonoff():
 
         if self._ws is None:
             try:
-                self._ws = create_connection(('wss://{}:8080/api/ws'.format(self._wshost)), timeout=2)
+                self._ws = create_connection(('wss://{}:8080/api/ws'.format(self._wshost)), timeout=5)
 
                 payload = {
                     'action'    : "userOnline",
@@ -230,7 +236,7 @@ class Sonoff():
                     'apkVesrion': "1.8",
                     'os'        : 'ios',
                     'at'        : self.get_bearer_token(),
-                    'apikey'    : self.get_apikey(),
+                    'apikey'    : self.get_user_apikey(),
                     'ts'        : str(int(time.time())),
                     'model'     : 'iPhone10,6',
                     'romVersion': '11.1.2',
@@ -242,6 +248,7 @@ class Sonoff():
                 # _LOGGER.error("open socket: %s", wsresp)
 
             except (socket.timeout, ConnectionRefusedError, ConnectionResetError):
+                _LOGGER.error('failed to create the websocket')
                 self._ws = None
 
         return self._ws
@@ -255,6 +262,9 @@ class Sonoff():
             return (not newstate)
 
         self._ws = self._get_ws()
+        
+        if not self._ws:
+            _LOGGER.warning('invalid websocket, state cannot be changed')
 
         _LOGGER.debug("Switching `%s` to state: %s", deviceid, newstate)
 
@@ -262,18 +272,35 @@ class Sonoff():
         if isinstance(newstate, (bool)):
             newstate = 'on' if newstate else 'off'
 
+        device = self.get_device(deviceid)
+
+        if not device:
+            _LOGGER.error('unknown device to be updated')
+
+        # the payload rule is like this:
+        #   normal device (non-shared) 
+        #       apikey      = login apikey (= device apikey too)
+        #
+        #   shared device
+        #       apikey      = device apikey
+        #       selfApiKey  = login apikey (yes, it's typed corectly selfApikey and not selfApiKey :|)
+
         payload = {
             'action'        : 'update',
             'userAgent'     : 'app',
             'params'        : {
                 'switch' : newstate
             },
-            'apikey'        : str(self.get_apikey()),
+            'apikey'        : device['apikey'],
             'deviceid'      : str(deviceid),
             'sequence'      : str(time.time()).replace('.',''),
             'controlType'   : 4,
             'ts'            : 0
         }
+
+        # this key is needed for a shared device
+        if device['apikey'] != self.get_user_apikey():
+            payload['selfApikey'] = self.get_user_apikey()
 
         self._ws.send(json.dumps(payload))
         wsresp = self._ws.recv()
@@ -302,7 +329,7 @@ class SonoffDevice(Entity):
         self._name          = 'sonoff_{}'.format(device['deviceid']) 
         self._device_name   = device['name']
         self._deviceid      = device['deviceid']
-        self._apikey        = device['apikey']
+        self._user_apikey   = device['apikey']
         self._state         = device['params']['switch'] == 'on'
         self._available     = device['online']
 
