@@ -311,7 +311,7 @@ class Sonoff():
             'apikey'        : device['apikey'],
             'deviceid'      : str(deviceid),
             'sequence'      : str(time.time()).replace('.',''),
-            'controlType'   : device['params']['controlType'],
+            'controlType'   : device['params']['controlType'] if 'controlType' in device['params'] else 4,
             'ts'            : 0
         }
 
