@@ -23,7 +23,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         # the device has multiple switches, split them by outlet
         if 'switches' in device['params']:
             for outlet in device['params']['switches']:
-                entity = SonoffSwitch(hass, device, outlet)
+                entity = SonoffSwitch(hass, device, outlet['outlet'])
                 entities.append(entity)
         
         # normal device = Sonoff Basic (and alike)
