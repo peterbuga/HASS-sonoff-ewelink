@@ -19,11 +19,11 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
  
     entities = []
 
-    for device in hass.data[DOMAIN].get_devices(force_update = False):
+    for device in hass.data[DOMAIN].get_devices(force_update = True):
         entity = SonoffSwitch(hass, device)
         entities.append(entity)
 
-    async_add_entities(entities, update_before_add=False)
+    async_add_entities(entities, update_before_add=True)
 
 class SonoffSwitch(SonoffDevice, SwitchDevice):
     """Representation of a Sonoff device (switch)."""
