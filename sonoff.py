@@ -287,6 +287,7 @@ class Sonoff():
 
         if not device:
             _LOGGER.error('unknown device to be updated')
+            return False
 
         # the payload rule is like this:
         #   normal device (non-shared) 
@@ -297,7 +298,7 @@ class Sonoff():
         #       selfApiKey  = login apikey (yes, it's typed corectly selfApikey and not selfApiKey :|)
 
         if outlet is not None:
-            params = device['params']
+            params = { 'switches' : device['params']['switches'] }
             params['switches'][outlet]['switch'] = new_state
 
         else:
