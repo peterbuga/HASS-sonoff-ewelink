@@ -36,8 +36,7 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
         # the device has multiple switches, split them by outlet
         if 'switches' in device['params']:
             for outlet in device['params']['switches']:
-                if outlet['switch'] != 'keep': # do not add not setted/used outlet
-                    SonoffDevice.__init__(self, hass, device, outlet['outlet'])
+                SonoffDevice.__init__(self, hass, device, outlet['outlet'])
 
         # normal device = Sonoff Basic (and alike)
         else:

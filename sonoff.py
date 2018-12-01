@@ -376,6 +376,13 @@ class SonoffDevice(Entity):
 
     def get_available(self):
         device = self.get_device()
+
+        if self._outlet is not None and device:
+            # this is a particular case where the state of the switch is reported as `keep` 
+            # and i want to track this visualy using the unavailability status in history panel
+            if device['online'] and device['params']['switches'][self._outlet]['switch'] == 'keep':
+                return False
+
         return device['online'] if device else False
 
     @property
