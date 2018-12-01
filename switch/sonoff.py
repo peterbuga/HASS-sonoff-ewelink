@@ -20,26 +20,24 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     entities = []
 
     for device in hass.data[DOMAIN].get_devices(force_update = True):
-        entity = SonoffSwitch(hass, device)
-        entities.append(entity)
+        # the device has multiple switches, split them by outlet
+        if 'switches' in device['params']:
+            for outlet in device['params']['switches']:
+                entity = SonoffSwitch(hass, device, outlet)
+                entities.append(entity)
+        
+        # normal device = Sonoff Basic (and alike)
+        else:
+            entity = SonoffSwitch(hass, device)
+            entities.append(entity)    
 
     async_add_entities(entities, update_before_add=False)
 
 class SonoffSwitch(SonoffDevice, SwitchDevice):
     """Representation of a Sonoff device (switch)."""
 
-    def __init__(self, hass, device):
+    def __init__(self, hass, device, outlet = None):
         """Initialize the device."""
 
         # add switch unique stuff here if needed
-
-        # the device has multiple switches, split them by outlet
-        if 'switches' in device['params']:
-            _LOGGER.debug("Device %s has %d switches available" % (device['name'], len(device['params']['switches'])) )
-
-            for outlet in device['params']['switches']:
-                SonoffDevice.__init__(self, hass, device, outlet['outlet'])
-
-        # normal device = Sonoff Basic (and alike)
-        else:
-            SonoffDevice.__init__(self, hass, device)
+        SonoffDevice.__init__(self, hass, device, outlet)
