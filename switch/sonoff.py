@@ -35,6 +35,8 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
 
         # the device has multiple switches, split them by outlet
         if 'switches' in device['params']:
+            _LOGGER.debug("Device %d has %d switches available" % (device['name'], len(device['params']['switches'])) )
+
             for outlet in device['params']['switches']:
                 SonoffDevice.__init__(self, hass, device, outlet['outlet'])
 
