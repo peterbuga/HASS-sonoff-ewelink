@@ -53,9 +53,10 @@ This is just a proof of concept because I searched for it and there was no imple
 | Model                              | Supported | Fw 1.6 | Fw 1.8.1 | Fw 2.6 | Remarks                      |
 |------------------------------------|:---------:|:------:|:--------:|:------:|------------------------------|
 | Sonoff Basic                       |    yes    |   yes  |    yes   |   yes  |                              |
-| Sonoff 4CH Pro (R2)                |           |        |          |        |                              |
+| Sonoff 4CH Pro (R2)                |    yes    |        |          |   yes  |                              |
 | WHDTS WiFi Momentary Inching Relay |    yes    |        |          |        | displayed as a switch button |
 
+`yes` = confirmed version, [empty] = unknown for sure 
 
 ## Requests / Bugs
 
