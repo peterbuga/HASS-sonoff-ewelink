@@ -37,7 +37,7 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
         if 'switches' in device['params']:
             for outlet in device['params']['switches']:
                 if outlet['switch'] != 'keep': # do not add not setted/used outlet
-                    SonoffDevice.__init__(self, hass, device, outlet)
+                    SonoffDevice.__init__(self, hass, device, outlet['outlet'])
 
         # normal device = Sonoff Basic (and alike)
         else:

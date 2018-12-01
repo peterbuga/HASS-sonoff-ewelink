@@ -51,10 +51,10 @@ This is just a proof of concept because I searched for it and there was no imple
 ## Compatibility list
 
 | Model                              | Supported | Fw 1.6 | Fw 1.8.1 | Fw 2.6 | Remarks                      |
-|------------------------------------|-----------|:------:|:--------:|:------:|------------------------------|
-| Sonoff Basic                       | yes       |   yes  |    yes   |   yes  |                              |
+|------------------------------------|:---------:|:------:|:--------:|:------:|------------------------------|
+| Sonoff Basic                       |    yes    |   yes  |    yes   |   yes  |                              |
 | Sonoff 4CH Pro (R2)                |           |        |          |        |                              |
-| WHDTS WiFi Momentary Inching Relay | yes       |        |          |        | displayed as a switch button |
+| WHDTS WiFi Momentary Inching Relay |    yes    |        |          |        | displayed as a switch button |
 
 
 ## Requests / Bugs
