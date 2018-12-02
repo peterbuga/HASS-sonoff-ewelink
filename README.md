@@ -1,6 +1,10 @@
 # Home Assistant component for original firmware Sonoff / eWeLink switches
 Simple Home Assistant component to add/control Sonoff/eWeLink smart switches using the stock firmware and cloud capabilities.
 
+***
+### WARNING: completely deactivate the `sonoff` component from HA while doing a firmware update, due to auto-relogin function you might be kicked out of the app before the process is completed. I would not be held liable for any problems occuring if not following this steps!
+***
+
 **CHECK COMPATIBILITY LIST BELOW! IF IT DOESN'T WORK FOR YOUR DEVICE DON'T COMPLAIN AND OPEN A PROPER ISSUE**
 
 ##Setup
@@ -33,34 +37,33 @@ And copy the *.py files in `custom_components` folder using the same structure l
 
 This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (althought I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
 
-## Updates
 
+## Compatibility list
+| Model                              | Supported | Fw 1.6 | Fw 1.8.1 | Fw 2.6 | Remarks                      |
+|------------------------------------|:---------:|:------:|:--------:|:------:|------------------------------|
+| Sonoff Basic                       |    yes    |   yes  |    yes   |   yes  |                              |
+| Sonoff 4CH Pro (R2)                |    yes    |        |          |   yes  |                              |
+| Sonoff S20                         |    yes    |        |    yes   |        |                              |
+| [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G)         |    yes    |        |          |        |                              |
+| WHDTS WiFi Momentary Inching Relay |    yes    |        |          |        | displayed as a switch button |
+`yes` = confirmed version, [empty] = unknown for sure 
+
+## Updates
 - 2018.12.01
   - ability to control devices with multiple switches 
   - added mobile app specified device-name as default to be listed in HA entity, added `entity_name` option and removed the default `sonoff_` prefix
   - fixed bug that will show device as unavailable in the grace period
-
 - 2018.11.29 
   - shared devices from another account can be used also
-
 - 2018.11.28 
   - mobile app-like login to the closest region 
   - added `scan_interval` option
   - added `grace_period` option
 
-## Compatibility list
-
-| Model                              | Supported | Fw 1.6 | Fw 1.8.1 | Fw 2.6 | Remarks                      |
-|------------------------------------|:---------:|:------:|:--------:|:------:|------------------------------|
-| Sonoff Basic                       |    yes    |   yes  |    yes   |   yes  |                              |
-| Sonoff 4CH Pro (R2)                |    yes    |        |          |   yes  |                              |
-| WHDTS WiFi Momentary Inching Relay |    yes    |        |          |        | displayed as a switch button |
-
-`yes` = confirmed version, [empty] = unknown for sure 
-
 ## Requests / Bugs
-
-Feel free to properly report bugs (using the `sonoff-debug.py` script from this repo) / request features / fork (& pull request) I'll try to see what I can do.
+Feel free to properly ask support for new devices [using these guidelines](https://github.com/peterbuga/HASS-sonoff-ewelink/tree/master/sonoff-debug) / report bugs / request features / fork (& pull request) and I'll try to see what I can do.
 
 ## Credits 
-Most of the logic & code was done (partialy) porting this awesome repo (+those that it extends itself) https://github.com/howanghk/homebridge-ewelink
+- most of the logic & code was done (partialy) porting this awesome repo (+those that it extends itself) https://github.com/howanghk/homebridge-ewelink
+- @2016for for assisting me with properly integrating the switches with multiple outlets
+

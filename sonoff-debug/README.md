@@ -16,7 +16,11 @@ OR
 
 OR
 
-`python sonoff-debug.py -e 'email@used.com' -p 'password'` > devices.json 
+`python sonoff-debug.py -e 'email@used.com' -p 'password'` > devices.json
+
+**This script can be ran from any place/computer that has the required modules installed (google how to install the missing ones, it's out of the scope of this repo) meaning it's not mandatory to have HA installation to run it.** 
+
+This might help those who have a **Hassio installation** https://community.home-assistant.io/t/test-python-script-on-hassio/55268 
 
 ## Example of expected output (Sonoff Basic)
 
