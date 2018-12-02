@@ -7,7 +7,7 @@ Simple Home Assistant component to add/control Sonoff/eWeLink smart switches usi
 
 **CHECK COMPATIBILITY LIST BELOW! IF IT DOESN'T WORK FOR YOUR DEVICE DON'T COMPLAIN AND OPEN A PROPER ISSUE**
 
-##Setup
+## Setup
 
 To setup add to your configuration.yaml:
 ```yaml
@@ -46,6 +46,7 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff S20                         |    yes    |        |    yes   |        |                              |
 | [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G)         |    yes    |        |          |        |                              |
 | WHDTS WiFi Momentary Inching Relay |    yes    |        |          |        | displayed as a switch button |
+
 `yes` = confirmed version, [empty] = unknown for sure 
 
 ## Updates
