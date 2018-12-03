@@ -45,6 +45,7 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff 4CH Pro (R2)                |    yes    |        |          |   yes  |                              |
 | Sonoff S20                         |    yes    |        |    yes   |        |                              |
 | [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G)         |    yes    |        |       |    yes    |  Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app)                              |
+| [1 Gang Generic Wall Switch](https://www.aliexpress.com/item/1-Gang-US-EU-UK-Plug-Wall-Wifi-Light-Switch-Smart-Touch-LED-Lights-Switch-for/32934184095.html)         |    yes    |        |       |    yes    |  Manfufacturer: KingART, Model: KING-N1 (according to ewelink app), Chip: PSF-B85 (ESP8285)                             |
 | WHDTS WiFi Momentary Inching Relay |    yes    |        |          |        | displayed as a switch button |
 
 `yes` = confirmed version, [empty] = unknown for sure 
