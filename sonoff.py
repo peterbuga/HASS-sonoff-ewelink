@@ -233,7 +233,7 @@ class Sonoff():
 
         if self._ws is None:
             try:
-                self._ws = create_connection(('wss://{}:8080/api/ws'.format(self._wshost)), timeout=5)
+                self._ws = create_connection(('wss://{}:8080/api/ws'.format(self._wshost)), timeout=10)
 
                 payload = {
                     'action'    : "userOnline",
@@ -272,6 +272,7 @@ class Sonoff():
         
         if not self._ws:
             _LOGGER.warning('invalid websocket, state cannot be changed')
+            return (not new_state)
 
         # convert from True/False to on/off
         if isinstance(new_state, (bool)):
