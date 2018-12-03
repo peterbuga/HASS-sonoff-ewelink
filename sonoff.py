@@ -12,13 +12,17 @@ from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_SCAN_INTERVAL,
     CONF_EMAIL, CONF_PASSWORD,
     HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED)
+
+# from threading import Thread
+import threading
+import websocket
 # from homeassistant.util import Throttle
 
 CONF_API_REGION     = 'api_region'
 CONF_GRACE_PERIOD   = 'grace_period'
 CONF_ENTITY_NAME    = 'entity_name' 
 
-SCAN_INTERVAL = timedelta(seconds=60)
+SCAN_INTERVAL = timedelta(seconds=15)
 DOMAIN = "sonoff"
 
 REQUIREMENTS = ['uuid', 'websocket-client']
@@ -57,11 +61,12 @@ async def async_setup(hass, config):
     # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].restore_all())
 
     def update_devices(event_time):
-        """Refresh"""     
-        _LOGGER.debug("Updating devices status")
+    #     """Refresh"""     
+    #     _LOGGER.debug("Updating devices status")
 
-        # @REMINDER figure it out how this works exactly and/or replace it with websocket
-        run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
+    #     # @REMINDER figure it out how this works exactly and/or replace it with websocket
+    #     run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
+        run_coroutine_threadsafe( hass.data[DOMAIN].async_ping(), hass.loop)
 
     async_track_time_interval(hass, update_devices, SCAN_INTERVAL)
 
@@ -152,6 +157,32 @@ class Sonoff():
             # get the websocket host
             if not self._wshost:
                 self.set_wshost()
+
+            self.thread = threading.Thread(target=self.retrieve_pushes)
+            self.thread.daemon = True
+            self.thread.start()
+
+    def retrieve_pushes(self):
+        """Retrieve_pushes.
+
+        Spawn a new Listener and links it to self.on_push.
+        """
+        self.listener = WebsocketListener(wshost=self._wshost, 
+                                bearer_token=self.get_bearer_token(), 
+                                user_apikey=self.get_user_apikey(), 
+                                on_push=self.on_push)
+
+        _LOGGER.debug("Getting pushes")
+        try:
+            self.listener.run_forever(ping_interval=30)
+        finally:
+            self.listener.close()
+
+    def on_push(self, data):
+        _LOGGER.warning('we got a push: %s', data)
+
+    async def async_ping(self):
+        self.listener.send('ping')
 
     def set_wshost(self):
         r = requests.post('https://%s-disp.coolkit.cc:8080/dispatch/app' % self._api_region, headers=self._headers)
@@ -252,7 +283,7 @@ class Sonoff():
 
                 self._ws.send(json.dumps(payload))
                 wsresp = self._ws.recv()
-                # _LOGGER.error("open socket: %s", wsresp)
+                _LOGGER.error("open socket: %s", wsresp) 
 
             except (socket.timeout, ConnectionRefusedError, ConnectionResetError):
                 _LOGGER.error('failed to create the websocket')
@@ -340,6 +371,70 @@ class Sonoff():
         # only IF MAIN STATUS is done over websocket exclusively
 
         return new_state
+
+
+class WebsocketListener(threading.Thread, websocket.WebSocketApp):
+    def __init__(self, wshost, bearer_token, user_apikey, on_push=None, on_error=None):
+
+        self.on_error = on_error
+
+        self._wshost = wshost
+        self._bearer_token = bearer_token
+        self._user_apikey = user_apikey
+
+        threading.Thread.__init__(self)
+        websocket.WebSocketApp.__init__(self, 'wss://{}:8080/api/ws'.format(self._wshost),
+                                        on_open=self.on_open,
+                                        on_error=self.on_error,
+                                        on_message=self.on_message,
+                                        on_close=self.on_close)
+
+        self.connected = False
+        self.last_update = time.time()
+
+        self.on_push = on_push
+
+    def on_open(self):
+        self.connected = True
+        self.last_update = time.time()
+
+        payload = {
+            'action'    : "userOnline",
+            'userAgent' : 'app',
+            'version'   : 6,
+            'nonce'     : gen_nonce(15),
+            'apkVesrion': "1.8",
+            'os'        : 'ios',
+            'at'        : self._bearer_token,
+            'apikey'    : self._user_apikey,
+            'ts'        : str(int(time.time())),
+            'model'     : 'iPhone10,6',
+            'romVersion': '11.1.2',
+            'sequence'  : str(time.time()).replace('.','')
+        }
+
+        self.send(json.dumps(payload))
+
+    def on_close(self):
+        # log.debug('Listener closed')
+        self.connected = False
+
+    def on_message(self, message):
+        # _LOGGER.warning('Message received:' + message)
+        self.on_push(message)
+        # try:
+        #     json_message = json.loads(message)
+        #     if json_message["type"] != "nop":
+        #         self.on_push(json_message)
+        # except Exception as e:
+        #     logging.exception(e)
+
+    def run_forever(self, sockopt=None, sslopt=None, ping_interval=0, ping_timeout=None):
+        websocket.WebSocketApp.run_forever(self, sockopt=sockopt, sslopt=sslopt, ping_interval=ping_interval,
+                                           ping_timeout=ping_timeout)
+
+    def run(self):
+        self.run_forever()
 
 class SonoffDevice(Entity):
     """Representation of a Sonoff device"""
