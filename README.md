@@ -44,7 +44,7 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff Basic                       |    yes    |   yes  |    yes   |   yes  |                              |
 | Sonoff 4CH Pro (R2)                |    yes    |        |          |   yes  |                              |
 | Sonoff S20                         |    yes    |        |    yes   |        |                              |
-| [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G)         |    yes    |        |          |        |                              |
+| [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G)         |    yes    |        |       |    yes    |  Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app)                              |
 | WHDTS WiFi Momentary Inching Relay |    yes    |        |          |        | displayed as a switch button |
 
 `yes` = confirmed version, [empty] = unknown for sure 
