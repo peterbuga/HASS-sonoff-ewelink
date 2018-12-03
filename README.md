@@ -27,6 +27,8 @@ And copy the *.py files in `custom_components` folder using the same structure l
         └── sonoff.py
 ```
 
+`email` for 'cn' region users, you can put registered phone number into this field. the (+86) is required, such as '+8612345678901'. And you also must assign 'cn' for api_region.  
+
 `scan_interval` you can define how fast the state of devices is refreshed (by default every 60sec).  for example if you change the switch from an external source like Alexa or Google Home the change will show up in HA in maximum less than specified period, while changing it using HA interface/actions/etc it's instantly
 
 `grace_period` eWeLink app allows **only one active session at a time**, therefore this will temporarily block HA refreshes for the specified amount (in seconds) to allow (or better said **after**) you to login in the app and do required changes to your devices. following that sonoff component does an internal re-login invalidating the mobile session and the process restarts. (as a workaround for this, you can create a 2nd account and share the devices from main one, therefore one will be used in HA another one in mobile app)

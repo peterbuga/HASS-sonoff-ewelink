@@ -100,7 +100,6 @@ class Sonoff():
         self._skipped_login = 0
         
         app_details = {
-            'email'     : self._email,
             'password'  : self._password,
             'version'   : '6',
             'ts'        : int(time.time()),
@@ -112,6 +111,11 @@ class Sonoff():
             'romVersion': '11.1.2',
             'appVersion': '3.5.3'
         }
+
+        if self._api_region == 'cn':
+            app_details['phoneNumber'] = self._email
+        else:
+            app_details['email'] = self._email
 
         decryptedAppSecret = b'6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
 
@@ -395,6 +399,13 @@ class SonoffDevice(Entity):
     def name(self):
         """Return the name of the switch."""
         return self._name
+
+    # entity id is required if the name use other characters not in ascii
+    @property
+    def entity_id(self):
+        """Return the unique id of the switch."""
+        # return DOMAIN + "." + self._deviceid 
+        return "switch." + self._deviceid 
 
     @property
     def is_on(self):
