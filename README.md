@@ -12,12 +12,14 @@ Simple Home Assistant component to add/control Sonoff/eWeLink smart switches usi
 To setup add to your configuration.yaml:
 ```yaml
 sonoff:
-  email: [registered email]
+  username: [registered phone or email]
   password: [password]
+  email: [registered email] (optional)
   scan_interval: 60 (optional)
   grace_period: 600 (optional)
   api_region: 'eu' (optional)
   entity_name: True (optional)
+  user_type: 'email'/'phone' (optional)
 ```
 And copy the *.py files in `custom_components` folder using the same structure like defined here:
 ```
@@ -26,6 +28,12 @@ And copy the *.py files in `custom_components` folder using the same structure l
     └── switch
         └── sonoff.py
 ```
+
+`email` [Deprecated] only for compatibility, may be eliminated in future.If your username is a phone number *DO NOT* set this field.
+
+`username` the username that you registered for ewelink account. If your username is a phone number, please refer to user_type field, and the phone number should lead with region number, '+8612345678901' for example.
+
+`user_type` either 'email'(default) or 'phone'. The type of your username, if your username is a phone number, *DO* set this field to 'phone'
 
 `scan_interval` you can define how fast the state of devices is refreshed (by default every 60sec).  for example if you change the switch from an external source like Alexa or Google Home the change will show up in HA in maximum less than specified period, while changing it using HA interface/actions/etc it's instantly
 
@@ -45,7 +53,6 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff 4CH Pro (R2)                |    yes    |        |          |   yes  |                              |
 | Sonoff S20                         |    yes    |        |    yes   |        |                              |
 | [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G)         |    yes    |        |       |    yes    |  Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app)                              |
-| [1 Gang Generic Wall Switch](https://www.aliexpress.com/item/1-Gang-US-EU-UK-Plug-Wall-Wifi-Light-Switch-Smart-Touch-LED-Lights-Switch-for/32934184095.html)         |    yes    |        |       |    yes    |  Manfufacturer: KingART, Model: KING-N1 (according to ewelink app), Chip: PSF-B85 (ESP8285)                             |
 | WHDTS WiFi Momentary Inching Relay |    yes    |        |          |        | displayed as a switch button |
 
 `yes` = confirmed version, [empty] = unknown for sure 
