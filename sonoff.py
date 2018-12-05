@@ -1,5 +1,5 @@
 # The domain of your component. Should be equal to the name of your component.
-import logging, time, hmac, hashlib, random, base64, json, socket, requests
+import logging, time, hmac, hashlib, random, base64, json, socket, requests, re
 import voluptuous as vol
 
 from datetime import timedelta
@@ -10,13 +10,13 @@ from homeassistant.helpers import discovery
 from homeassistant.helpers import config_validation as cv
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_SCAN_INTERVAL,
-    CONF_EMAIL, CONF_PASSWORD,
-    HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED)
+    CONF_EMAIL, CONF_PASSWORD, CONF_USERNAME,
+    HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, 
+    HTTP_UNAUTHORIZED, HTTP_NOT_FOUND)
 # from homeassistant.util import Throttle
 
 CONF_API_REGION     = 'api_region'
 CONF_GRACE_PERIOD   = 'grace_period'
-CONF_ENTITY_NAME    = 'entity_name' 
 
 SCAN_INTERVAL = timedelta(seconds=60)
 DOMAIN = "sonoff"
@@ -27,15 +27,14 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
-        vol.Optional(CONF_USERNAME): cv.string,
+        vol.Exclusive(CONF_USERNAME, CONF_PASSWORD): cv.string, 
+        vol.Exclusive(CONF_EMAIL, CONF_PASSWORD): cv.string,
+
         vol.Required(CONF_PASSWORD): cv.string,
-        vol.Optional(CONF_EMAIL): cv.string,  # for backward compatibility
         vol.Optional(CONF_API_REGION, default='eu'): cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
-        vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
-        vol.Optional(CONF_ENTITY_NAME, default=True): cv.boolean,
-        vol.Optional(CONF_USER_TYPE, default='email'): cv.string,
-    }),
+        vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int
+    }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
 
 def gen_nonce(length=8):
@@ -55,9 +54,6 @@ async def async_setup(hass, config):
     for component in ['switch']:
         discovery.load_platform(hass, component, DOMAIN, {}, config)
 
-    # maybe close websocket with this (if it runs)
-    # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].restore_all())
-
     def update_devices(event_time):
         """Refresh"""     
         _LOGGER.debug("Updating devices status")
@@ -73,21 +69,21 @@ class Sonoff():
     # def __init__(self, hass, email, password, api_region, grace_period):
     def __init__(self, config):
 
-        # get email & password from configuration.yaml
+        # get username & password from configuration.yaml
         email           = config.get(DOMAIN, {}).get(CONF_EMAIL,'')
         username        = config.get(DOMAIN, {}).get(CONF_USERNAME,'')
         password        = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
         api_region      = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
         grace_period    = config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,'')
-        entity_name     = config.get(DOMAIN, {}).get(CONF_ENTITY_NAME,'')
-        user_type       = config.get(DOMAIN, {}).get(CONF_USER_TYPE,'')
 
-        self._email         = email
-        self._username      = username
+        if email and not username: # backwards compatibility
+            self._username = email.strip()
+
+        else: # already validated by voluptous
+            self._username      = username.strip()
+
         self._password      = password
         self._api_region    = api_region
-        self._entity_name   = entity_name
-        self._user_type     = usert_type
         self._wshost        = None
 
         self._skipped_login = 0
@@ -118,16 +114,10 @@ class Sonoff():
             'appVersion': '3.5.3'
         }
 
-        if not self._username and not self._email:
-            _LOGGER.error("must provide either username or email")
-            # there needs more work to info the user
-            return
-        if self._user_type == 'phone':
-            app_details['phoneNumber'] = self._username
-        else:
+        if re.match(r'[^@]+@[^@]+\.[^@]+', self._username):
             app_details['email'] = self._username
-        if self._email:
-            app_details['email'] = self._email
+        else:
+            app_details['phoneNumber'] = self._username
 
         decryptedAppSecret = b'6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
 
@@ -151,23 +141,33 @@ class Sonoff():
         # get a new region to login
         if 'error' in resp and 'region' in resp and resp['error'] == HTTP_MOVED_PERMANENTLY:
             self._api_region    = resp['region']
-            self._wshost        = None
 
-            _LOGGER.warning("found new region: >>> `%s` <<< (you should change api_region option to this value in configuration.yaml)", self._api_region)
+            _LOGGER.warning("found new region: >>> %s <<< (you should change api_region option to this value in configuration.yaml)", self._api_region)
 
             # re-login using the new localized endpoint
             self.do_login()
+            return
 
-        else:
-            self._bearer_token  = resp['at']
-            self._user_apikey   = resp['user']['apikey']
-            self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
+        elif 'error' in resp and resp['error'] in [HTTP_NOT_FOUND, HTTP_BAD_REQUEST]:
+            # (most likely) login with +86... phone number and region != cn
+            if '@' not in self._username and self._api_region != 'cn':
+                self._api_region    = 'cn'
+                self.do_login()
 
-            self.update_devices() # to write the devices list 
+            else:
+                _LOGGER.error("Couldn't authenticate using the provided credentials!")
 
-            # get the websocket host
-            if not self._wshost:
-                self.set_wshost()
+            return
+
+        self._bearer_token  = resp['at']
+        self._user_apikey   = resp['user']['apikey']
+        self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
+
+        # get the websocket host
+        if not self._wshost:
+            self.set_wshost()
+
+        self.update_devices() # to get the devices list 
 
     def set_wshost(self):
         r = requests.post('https://%s-disp.coolkit.cc:8080/dispatch/app' % self._api_region, headers=self._headers)
@@ -189,6 +189,11 @@ class Sonoff():
         return grace_status
 
     def update_devices(self):
+
+        # the login failed, nothing to update
+        if not self._wshost:
+            return []
+
         # we are in the grace period, no updates to the devices
         if self._skipped_login and self.is_grace_period():          
             _LOGGER.info("Grace period active")            
@@ -229,9 +234,6 @@ class Sonoff():
 
     def get_user_apikey(self):
         return self._user_apikey
-
-    def get_entity_name(self):
-        return self._entity_name
 
     # async def async_get_devices(self):
     #     return self.get_devices()
@@ -364,9 +366,7 @@ class SonoffDevice(Entity):
         """Initialize the device."""
 
         self._hass          = hass
-        self._name          = '{}{}'.format(
-                                device['name'] if self._hass.data[DOMAIN].get_entity_name() else device['deviceid'],
-                                '' if outlet is None else ' '+str(outlet+1))
+        self._name          = '{}{}'.format(device['name'], '' if outlet is None else ' '+str(outlet+1))
         self._deviceid      = device['deviceid']
         self._available     = device['online']
         self._outlet        = outlet 
@@ -412,12 +412,6 @@ class SonoffDevice(Entity):
     def name(self):
         """Return the name of the switch."""
         return self._name
-
-    # entity id is required if the name use other characters not in ascii
-    @property
-    def entity_id(self):
-        """Return the unique id of the switch."""
-        return "switch." + self._deviceid 
 
     @property
     def is_on(self):

@@ -4,9 +4,9 @@ import logging, time, hmac, hashlib, random, base64, json, socket
 from homeassistant.components.switch import SwitchDevice
 from datetime import timedelta
 from homeassistant.util import Throttle
-
+from homeassistant.components.switch import DOMAIN
 # from homeassistant.components.sonoff import (DOMAIN, SonoffDevice)
-from custom_components.sonoff import (DOMAIN, SonoffDevice)
+from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 
 # @TODO add PLATFORM_SCHEMA here (maybe)
 
@@ -19,7 +19,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
  
     entities = []
 
-    for device in hass.data[DOMAIN].get_devices(force_update = True):
+    for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = True):
         # the device has multiple switches, split them by outlet
         if 'switches' in device['params']:
             for outlet in device['params']['switches']:
@@ -41,3 +41,9 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
 
         # add switch unique stuff here if needed
         SonoffDevice.__init__(self, hass, device, outlet)
+
+    # entity id is required if the name use other characters not in ascii
+    @property
+    def entity_id(self):
+        """Return the unique id of the switch."""
+        return "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid)
