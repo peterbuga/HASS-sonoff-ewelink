@@ -27,12 +27,14 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
-        vol.Required(CONF_EMAIL): cv.string,
+        vol.Optional(CONF_USERNAME): cv.string,
         vol.Required(CONF_PASSWORD): cv.string,
+        vol.Optional(CONF_EMAIL): cv.string,  # for backward compatibility
         vol.Optional(CONF_API_REGION, default='eu'): cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
         vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
         vol.Optional(CONF_ENTITY_NAME, default=True): cv.boolean,
+        vol.Optional(CONF_USER_TYPE, default='email'): cv.string,
     }),
 }, extra=vol.ALLOW_EXTRA)
 
@@ -73,15 +75,19 @@ class Sonoff():
 
         # get email & password from configuration.yaml
         email           = config.get(DOMAIN, {}).get(CONF_EMAIL,'')
+        username        = config.get(DOMAIN, {}).get(CONF_USERNAME,'')
         password        = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
         api_region      = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
         grace_period    = config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,'')
         entity_name     = config.get(DOMAIN, {}).get(CONF_ENTITY_NAME,'')
+        user_type       = config.get(DOMAIN, {}).get(CONF_USER_TYPE,'')
 
         self._email         = email
+        self._username      = username
         self._password      = password
         self._api_region    = api_region
         self._entity_name   = entity_name
+        self._user_type     = usert_type
         self._wshost        = None
 
         self._skipped_login = 0
@@ -100,7 +106,6 @@ class Sonoff():
         self._skipped_login = 0
         
         app_details = {
-            'email'     : self._email,
             'password'  : self._password,
             'version'   : '6',
             'ts'        : int(time.time()),
@@ -112,6 +117,17 @@ class Sonoff():
             'romVersion': '11.1.2',
             'appVersion': '3.5.3'
         }
+
+        if not self._username and not self._email:
+            _LOGGER.error("must provide either username or email")
+            # there needs more work to info the user
+            return
+        if self._user_type == 'phone':
+            app_details['phoneNumber'] = self._username
+        else:
+            app_details['email'] = self._username
+        if self._email:
+            app_details['email'] = self._email
 
         decryptedAppSecret = b'6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
 
@@ -396,6 +412,12 @@ class SonoffDevice(Entity):
     def name(self):
         """Return the name of the switch."""
         return self._name
+
+    # entity id is required if the name use other characters not in ascii
+    @property
+    def entity_id(self):
+        """Return the unique id of the switch."""
+        return "switch." + self._deviceid 
 
     @property
     def is_on(self):
