@@ -12,12 +12,14 @@ Simple Home Assistant component to add/control Sonoff/eWeLink smart switches usi
 To setup add to your configuration.yaml:
 ```yaml
 sonoff:
-  email: [registered email]
+  username: [registered phone or email]
   password: [password]
+  email: [registered email] (optional)
   scan_interval: 60 (optional)
   grace_period: 600 (optional)
   api_region: 'eu' (optional)
   entity_name: True (optional)
+  user_type: 'email'/'phone' (optional)
 ```
 And copy the *.py files in `custom_components` folder using the same structure like defined here:
 ```
@@ -27,7 +29,11 @@ And copy the *.py files in `custom_components` folder using the same structure l
         └── sonoff.py
 ```
 
-`email` for 'cn' region users, you can put registered phone number into this field. the (+86) is required, such as '+8612345678901'. And you also must assign 'cn' for api_region.  
+`email` [Deprecated] only for compatible, may be eliminated in future.If your username is a phone number *DO NOT* set this field.
+
+`username` the username that you registered for ewelink account. If your username is a phone number, please refer to user_type field, and the phone number should lead with region number, '+8612345678901' for example.
+
+`user_type` either 'email'(default) or 'phone'. The type of your username, if your username is a phone number, *MUST* set this field to 'phone'
 
 `scan_interval` you can define how fast the state of devices is refreshed (by default every 60sec).  for example if you change the switch from an external source like Alexa or Google Home the change will show up in HA in maximum less than specified period, while changing it using HA interface/actions/etc it's instantly
 
