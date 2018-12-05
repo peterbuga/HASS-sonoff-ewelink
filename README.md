@@ -14,12 +14,9 @@ To setup add to your configuration.yaml:
 sonoff:
   username: [email or phone number]
   password: [password]
-  email: [registered email] (optional)
   scan_interval: 60 (optional)
   grace_period: 600 (optional)
   api_region: 'eu' (optional)
-  entity_name: True (optional)
-  user_type: 'email'/'phone' (optional)
 ```
 And copy the *.py files in `custom_components` folder using the same structure like defined here:
 ```
