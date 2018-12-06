@@ -67,7 +67,9 @@ def do_login():
 
 def get_devices():
 	headers.update({'Authorization' : 'Bearer ' + user_details['at']})
-	r = requests.get('https://%s-api.coolkit.cc:8080/api/user/device' % api_region, headers=headers)
+	r = requests.get('https://%s-api.coolkit.cc:8080/api/user/device?lang=en&apiKey=%s&getTags=1' % \
+		(api_region, user_details['user']['apikey']), 
+		headers=headers)
 	devices = r.json()
 
 	return json.dumps(devices, indent=2, sort_keys=True)
@@ -80,6 +82,7 @@ def clean_data(data):
 	data = re.sub(r'"_id": ".*",', '"_id": "[hidden]"', data)
 	data = re.sub(r'"\w{2}:\w{2}:\w{2}:\w{2}:\w{2}:\w{2}"', '"xx:xx:xx:xx:xx:xx"', data)
 	data = re.sub(r'"\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"', '"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"', data)
+	data = re.sub(r'"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z"', '"xxxx-xx-xxxxx:xx:xx.xxx"', data)
 	return data
 
 if __name__ == "__main__":
