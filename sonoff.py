@@ -158,12 +158,12 @@ class Sonoff():
         # only IF MAIN STATUS is done over websocket exclusively
 
         # set also te pseudo-internal state of the device until the real refresh kicks in
-        for idx, device in enumerate(self._devices):
-            if device['deviceid'] == device['deviceid']:
+        for idxd, dev in enumerate(self._devices):
+            if dev['deviceid'] == device['deviceid']:
                 if outlet is not None:
-                    self._devices[idx]['params']['switches'][outlet]['switch'] = new_state
+                    self._devices[idxd]['params']['switches'][outlet]['switch'] = new_state
                 else:
-                    self._devices[idx]['params']['switch'] = new_state
+                    self._devices[idxd]['params']['switch'] = new_state
             
     def do_login(self):
         import uuid
