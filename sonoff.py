@@ -240,7 +240,6 @@ class Sonoff():
 
     def retrieve_pushes(self):
         """Retrieve_pushes.
-
         Spawn a new Listener and links it to self.on_push.
         """
         self.listener = WebsocketListener(wshost=self._wshost, 
@@ -257,9 +256,10 @@ class Sonoff():
     def on_push(self, data):
         # ignore pongs
         if data == 'pong':
+            _LOGGER.debug('pong ignored')
             return
 
-        _LOGGER.warning('websocket push: %s', data)
+        _LOGGER.debug('websocket push: %s', data)
 
         data = json.loads(data)
         if 'action' in data and data['action'] == 'update' and 'params' in data:
@@ -364,7 +364,8 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
 
         self.on_push = on_push
 
-    def on_open(self):
+    def on_open(self, ws):
+        _LOGGER.debug('Opening websocket')
         self.connected = True
         self.last_update = time.time()
 
@@ -385,12 +386,12 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
 
         self.send(json.dumps(payload))
 
-    def on_close(self):
+    def on_close(self, ws):
         # log.debug('Listener closed')
-        self.connected = False
+        _LOGGER.warning('Closing websocket')
 
-    def on_message(self, message):
-        # _LOGGER.warning('Message received:' + message)
+    def on_message(self, ws, message):
+        _LOGGER.debug('Message received:' + message)
         self.on_push(message)
         # try:
         #     json_message = json.loads(message)
