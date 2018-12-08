@@ -14,10 +14,9 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     """Add the Sonoff Switch entities"""
  
     entities = []
-    sonoff = hass.data[DOMAIN]
 
-    for device in sonoff.get_devices(force_update = True):
-        outlets_number = sonoff.get_outlets(device)
+    for device in hass.data[DOMAIN].get_devices(force_update = True):
+        outlets_number = hass.data[DOMAIN].get_outlets(device)
 
         if outlets_number is None: # fallback to whatever the device might have
             if 'switches' in device['params']: # the device has multiple switches, split them by outlets
@@ -51,7 +50,7 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
     @property
     def entity_id(self):
         """Return the unique id of the switch."""
-        entity_id = "switch." + self._deviceid
+        entity_id = "switch.%s" % self._deviceid
 
         if self._outlet is not None:
             entity_id = "%s_%s" % (entity_id, str(self._outlet+1) )

@@ -1,5 +1,5 @@
 # The domain of your component. Should be equal to the name of your component.
-import logging, time, hmac, hashlib, random, base64, json, socket, requests
+import logging, time, hmac, hashlib, random, base64, json, socket, requests, threading
 import voluptuous as vol
 
 from datetime import timedelta
@@ -14,8 +14,6 @@ from homeassistant.const import (
     HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED)
 
 # from homeassistant.util import Throttle
-import threading
-import websocket
 
 CONF_API_REGION     = 'api_region'
 CONF_GRACE_PERIOD   = 'grace_period'
@@ -24,6 +22,8 @@ SCAN_INTERVAL = timedelta(seconds=60)
 DOMAIN = "sonoff"
 
 REQUIREMENTS = ['uuid', 'websocket-client']
+
+import websocket
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,10 +37,6 @@ CONFIG_SCHEMA = vol.Schema({
     }),
 }, extra=vol.ALLOW_EXTRA)
 
-def gen_nonce(length=8):
-    """Generate pseudorandom number."""
-    return ''.join([str(random.randint(0, 9)) for i in range(length)])
-
 async def async_setup(hass, config):
     """Setup the eWelink/Sonoff component."""
 
@@ -48,12 +44,13 @@ async def async_setup(hass, config):
 
     _LOGGER.debug("Create the main object")
 
-    sonoff = Sonoff(hass, config)
-    hass.data[DOMAIN] = sonoff
+    hass.data[DOMAIN] = Sonoff(hass, config)
     
-    if sonoff.get_wshost(): # make sure login was successful
+    if hass.data[DOMAIN].get_wshost(): # make sure login was successful
         for component in ['switch']:
             discovery.load_platform(hass, component, DOMAIN, {}, config)
+
+        hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
 
         # close the websocket when HA stops
         # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
@@ -79,9 +76,7 @@ class Sonoff():
         self._user_apikey   = None
         self._ws            = None
         self._wshost        = None
-
         self._hass          = hass
-        self._hass.bus.async_listen('sonoff_state', self.state_listener)
 
         self.do_login()
             
@@ -96,7 +91,7 @@ class Sonoff():
             'password'  : self._password,
             'version'   : '6',
             'ts'        : int(time.time()),
-            'nonce'     : gen_nonce(15),
+            'nonce'     : ''.join([str(random.randint(0, 9)) for i in range(15)]),
             'appid'     : 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq',
             'imei'      : str(uuid.uuid4()),
             'os'        : 'iOS',
@@ -276,8 +271,7 @@ class Sonoff():
         return grace_status
 
     def set_entity_state(self, deviceid, state, outlet=None):
-        # @TODO get the names of the outlets (if provided)
-        entity_id = 'switch.%s%s' % (deviceid, str(outlet+1) if outlet else '')
+        entity_id = 'switch.%s%s' % (deviceid, '_'+str(outlet+1) if outlet is not None else '')
         attr = self._hass.states.get(entity_id).attributes
         self._hass.states.set(entity_id, state, attr)
 
@@ -447,7 +441,7 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
             'action'    : "userOnline",
             'userAgent' : 'app',
             'version'   : 6,
-            'nonce'     : gen_nonce(15),
+            'nonce'     : ''.join([str(random.randint(0, 9)) for i in range(15)]),
             'apkVesrion': "1.8",
             'os'        : 'ios',
             'at'        : self._sonoff.get_bearer_token(),
@@ -524,12 +518,6 @@ class SonoffDevice(Entity):
     def get_available(self):
         device = self.get_device()
 
-        if self._outlet is not None and device:
-            # this is a particular case where the state of the switch is reported as `keep` 
-            # and i want to track this visualy using the unavailability status in history panel
-            if device['online'] and device['params']['switches'][self._outlet]['switch'] == 'keep':
-                return False
-
         return device['online'] if device else False
 
     @property
@@ -558,26 +546,24 @@ class SonoffDevice(Entity):
         """Update device state."""
 
         # we don't update here because there's 1 single thread that can be active at anytime
-        # i.e. eWeLink API allows only 1 active session
+        # and the websocket will send the state update messages
         pass
 
     def turn_on(self, **kwargs):
         """Turn the device on."""
-        # self._state = self._hass.data[DOMAIN].switch(True, self._deviceid, self._outlet)
         self._hass.bus.async_fire('sonoff_state', {
-            'state': True,
-            'deviceid' : self._deviceid,
-            'outlet' : self._outlet
+            'state'     : True,
+            'deviceid'  : self._deviceid,
+            'outlet'    : self._outlet
         })
         self.async_schedule_update_ha_state()
 
     def turn_off(self, **kwargs):
         """Turn the device off."""
-        # self._state = self._hass.data[DOMAIN].switch(True, self._deviceid, self._outlet)
         self._hass.bus.async_fire('sonoff_state', {
-            'state' : False,
-            'deviceid' : self._deviceid,
-            'outlet' : self._outlet
+            'state'     : False,
+            'deviceid'  : self._deviceid,
+            'outlet'    : self._outlet
         })
         self.async_schedule_update_ha_state()
 
