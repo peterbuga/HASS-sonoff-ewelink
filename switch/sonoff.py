@@ -15,8 +15,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
  
     entities = []
 
-    for device in hass.data[DOMAIN].get_devices(force_update = True):
-        outlets_number = hass.data[DOMAIN].get_outlets(device)
+    for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = True):
+        outlets_number = hass.data[SONOFF_DOMAIN].get_outlets(device)
 
         if outlets_number is None: # fallback to whatever the device might have
             if 'switches' in device['params']: # the device has multiple switches, split them by outlets
