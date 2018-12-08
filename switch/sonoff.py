@@ -16,29 +16,28 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     entities = []
     sonoff = hass.data[DOMAIN]
 
-    if sonoff.get_wshost(): # make sure the login was successful 
-        for device in sonoff.get_devices(force_update = True):
-            outlets_number = sonoff.get_outlets(device)
+    for device in sonoff.get_devices(force_update = True):
+        outlets_number = sonoff.get_outlets(device)
 
-            if outlets_number is None: # fallback to whatever the device might have
-                if 'switches' in device['params']: # the device has multiple switches, split them by outlets
-                    for outlet in device['params']['switches']:
-                        entity = SonoffSwitch(hass, device, outlet['outlet'])
-                        entities.append(entity)
-                else:
-                    entity = SonoffSwitch(hass, device)
+        if outlets_number is None: # fallback to whatever the device might have
+            if 'switches' in device['params']: # the device has multiple switches, split them by outlets
+                for outlet in device['params']['switches']:
+                    entity = SonoffSwitch(hass, device, outlet['outlet'])
                     entities.append(entity)
-
-            elif outlets_number > 1: # the device has multiple switches, split them by available outlets
-                for outlet in range(0, outlets_number):
-                    entity = SonoffSwitch(hass, device, outlet)
-                    entities.append(entity)
-
-            else: # normal device = Sonoff Basic (and alike)
+            else:
                 entity = SonoffSwitch(hass, device)
                 entities.append(entity)
 
-        async_add_entities(entities, update_before_add=False)
+        elif outlets_number > 1: # the device has multiple switches, split them by available outlets
+            for outlet in range(0, outlets_number):
+                entity = SonoffSwitch(hass, device, outlet)
+                entities.append(entity)
+
+        else: # normal device = Sonoff Basic (and alike)
+            entity = SonoffSwitch(hass, device)
+            entities.append(entity)
+
+    async_add_entities(entities, update_before_add=False)
 
 class SonoffSwitch(SonoffDevice, SwitchDevice):
     """Representation of a Sonoff switch device."""

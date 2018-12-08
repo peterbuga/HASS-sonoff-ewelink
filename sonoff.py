@@ -48,18 +48,20 @@ async def async_setup(hass, config):
 
     _LOGGER.debug("Create the main object")
 
-    hass.data[DOMAIN] = Sonoff(hass, config)
+    sonoff = Sonoff(hass, config)
+    hass.data[DOMAIN] = sonoff
+    
+    if sonoff.get_wshost(): # make sure login was successful
+        for component in ['switch']:
+            discovery.load_platform(hass, component, DOMAIN, {}, config)
 
-    for component in ['switch']:
-        discovery.load_platform(hass, component, DOMAIN, {}, config)
+        # close the websocket when HA stops
+        # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
 
-    # close the websocket when HA stops
-    # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
+        def update_devices(event_time):
+            run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop )
 
-    def update_devices(event_time):
-        run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop )
-
-    async_track_time_interval(hass, update_devices, SCAN_INTERVAL)
+        async_track_time_interval(hass, update_devices, SCAN_INTERVAL)
 
     return True
 
@@ -280,15 +282,12 @@ class Sonoff():
         self._hass.states.set(entity_id, state, attr)
 
     def update_devices(self):
-        if not self.get_wshost(): # login failed check
-            return self._devices
-
         # we are in the grace period, no updates to the devices
         if self._skipped_login and self.is_grace_period():          
             _LOGGER.info("Grace period active")            
             return self._devices
 
-        r = requests.get('https://{}-api.coolkit.cc:8080/api/user/device'.format(self._api_region), 
+        r = requests.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1'.format(self._api_region, self.get_user_apikey()), 
             headers=self._headers)
 
         resp = r.json()
@@ -479,14 +478,31 @@ class SonoffDevice(Entity):
     def __init__(self, hass, device, outlet = None):
         """Initialize the device."""
         self._hass          = hass
-        self._name          = '{}{}'.format(device['name'], '' if outlet is None else (' %s' % str(outlet+1)) )
+
         self._deviceid      = device['deviceid']
         self._available     = device['online']
-        self._outlet        = outlet 
-
+        self._outlet        = outlet
         self._attributes    = {
-            'device_id'     : self._deviceid
+            'device_id'     : self._deviceid,
         }
+
+        if outlet is None:
+            self._name          = device['name']
+        else:
+            self._attributes['outlet'] = outlet
+
+            if 'tags' in device and 'ck_channel_name' in device['tags']:
+                if str(outlet) in device['tags']['ck_channel_name'].keys() and \
+                    device['tags']['ck_channel_name'][str(outlet)]:
+                    self._name          = '{} - {}'.format(
+                                            device['name'], 
+                                            device['tags']['ck_channel_name'][str(outlet)])
+
+                    self._attributes['outlet_name'] = device['tags']['ck_channel_name'][str(outlet)]
+                else:
+                    self._name          = '{} {}'.format(device['name'], ('CH %s' % str(outlet+1)) )
+            else:
+                self._name          = '{} {}'.format(device['name'], ('CH %s' % str(outlet+1)) )       
 
     def get_device(self):
         for device in self._hass.data[DOMAIN].get_devices():
