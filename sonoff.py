@@ -1,5 +1,5 @@
 # The domain of your component. Should be equal to the name of your component.
-import logging, time, hmac, hashlib, random, base64, json, socket, requests, threading
+import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading
 import voluptuous as vol
 
 from datetime import timedelta
@@ -10,9 +10,9 @@ from homeassistant.helpers import discovery
 from homeassistant.helpers import config_validation as cv
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_SCAN_INTERVAL,
-    CONF_EMAIL, CONF_PASSWORD,
-    HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED)
-
+    CONF_EMAIL, CONF_PASSWORD, CONF_USERNAME,
+    HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, 
+    HTTP_UNAUTHORIZED, HTTP_NOT_FOUND)
 # from homeassistant.util import Throttle
 
 CONF_API_REGION     = 'api_region'
@@ -29,12 +29,14 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
-        vol.Required(CONF_EMAIL): cv.string,
+        vol.Exclusive(CONF_USERNAME, CONF_PASSWORD): cv.string, 
+        vol.Exclusive(CONF_EMAIL, CONF_PASSWORD): cv.string,
+
         vol.Required(CONF_PASSWORD): cv.string,
         vol.Optional(CONF_API_REGION, default='eu'): cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
         vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int
-    }),
+    }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
 
 async def async_setup(hass, config):
@@ -49,14 +51,14 @@ async def async_setup(hass, config):
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
         for component in ['switch']:
             discovery.load_platform(hass, component, DOMAIN, {}, config)
-
+       
         hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
 
         # close the websocket when HA stops
         # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
 
         def update_devices(event_time):
-            run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop )
+            run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
 
         async_track_time_interval(hass, update_devices, SCAN_INTERVAL)
 
@@ -64,10 +66,17 @@ async def async_setup(hass, config):
 
 class Sonoff():
     def __init__(self, hass, config):
+        self._hass          = hass
+
         # get config details from from configuration.yaml
         self._email         = config.get(DOMAIN, {}).get(CONF_EMAIL,'')
+        self._username      = config.get(DOMAIN, {}).get(CONF_USERNAME,'')
         self._password      = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
         self._api_region    = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
+        self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
+
+        if self._email and not self._username: # backwards compatibility
+            self._username = self._email.strip()
 
         self._skipped_login = 0
         self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
@@ -76,7 +85,6 @@ class Sonoff():
         self._user_apikey   = None
         self._ws            = None
         self._wshost        = None
-        self._hass          = hass
 
         self.do_login()
             
@@ -87,7 +95,6 @@ class Sonoff():
         self._skipped_login = 0
         
         app_details = {
-            'email'     : self._email,
             'password'  : self._password,
             'version'   : '6',
             'ts'        : int(time.time()),
@@ -99,6 +106,11 @@ class Sonoff():
             'romVersion': '11.1.2',
             'appVersion': '3.5.3'
         }
+
+        if re.match(r'[^@]+@[^@]+\.[^@]+', self._username):
+            app_details['email'] = self._username
+        else:
+            app_details['phoneNumber'] = self._username
 
         decryptedAppSecret = b'6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
 
@@ -124,10 +136,19 @@ class Sonoff():
             self._api_region    = resp['region']
             self._wshost        = None
 
-            _LOGGER.warning("found new region: >>> `%s` <<< (you should change api_region option to this value in configuration.yaml)", self._api_region)
+            _LOGGER.warning("found new region: >>> %s <<< (you should change api_region option to this value in configuration.yaml)", self._api_region)
 
             # re-login using the new localized endpoint
             self.do_login()
+
+        elif 'error' in resp and resp['error'] in [HTTP_NOT_FOUND, HTTP_BAD_REQUEST]:
+            # (most likely) login with +86... phone number and region != cn
+            if '@' not in self._username and self._api_region != 'cn':
+                self._api_region = 'cn'
+                self.do_login()
+            else:
+                _LOGGER.error("Couldn't authenticate using the provided credentials!")
+
         else:
             if 'at' not in resp:
                 _LOGGER.error('Login failed! Please check credentials!')
@@ -455,8 +476,7 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
         self.send(json.dumps(payload))
 
     def on_close(self, *args):
-        # log.debug('Listener closed')
-        _LOGGER.error('---- sonoff ws closed ---- ')
+        _LOGGER.debug('websocket closed')
         self.connected = False
 
     def run_forever(self, sockopt=None, sslopt=None, ping_interval=0, ping_timeout=None):
@@ -471,8 +491,8 @@ class SonoffDevice(Entity):
 
     def __init__(self, hass, device, outlet = None):
         """Initialize the device."""
-        self._hass          = hass
 
+        self._hass          = hass
         self._deviceid      = device['deviceid']
         self._available     = device['online']
         self._outlet        = outlet
@@ -481,7 +501,7 @@ class SonoffDevice(Entity):
         }
 
         if outlet is None:
-            self._name          = device['name']
+            self._name      = device['name']
         else:
             self._attributes['outlet'] = outlet
 

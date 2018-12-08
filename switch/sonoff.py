@@ -2,11 +2,11 @@
 import logging, time, json
 
 from homeassistant.components.switch import SwitchDevice
-from datetime import timedelta
-# from homeassistant.util import Throttle
+from homeassistant.components.switch import DOMAIN
+#from homeassistant.util import Throttle
 
 # from homeassistant.components.sonoff import (DOMAIN, SonoffDevice)
-from custom_components.sonoff import (DOMAIN, SonoffDevice)
+from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,13 +46,15 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
 
         # add switch unique stuff here if needed
         SonoffDevice.__init__(self, hass, device, outlet)
-
+	
+    # entity id is required if the name use other characters not in ascii
     @property
     def entity_id(self):
         """Return the unique id of the switch."""
-        entity_id = "switch.%s" % self._deviceid
+        
+        entity_id = "{}.{}".format(DOMAIN, self._deviceid)
 
         if self._outlet is not None:
-            entity_id = "%s_%s" % (entity_id, str(self._outlet+1) )
+            entity_id = "{}_{}".format(entity_id, str(self._outlet+1) )
         
         return entity_id
