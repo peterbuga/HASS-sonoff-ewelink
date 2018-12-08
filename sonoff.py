@@ -13,16 +13,14 @@ from homeassistant.const import (
     CONF_EMAIL, CONF_PASSWORD,
     HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED)
 
-# from threading import Thread
+# from homeassistant.util import Throttle
 import threading
 import websocket
-# from homeassistant.util import Throttle
 
 CONF_API_REGION     = 'api_region'
 CONF_GRACE_PERIOD   = 'grace_period'
-CONF_ENTITY_NAME    = 'entity_name' 
 
-SCAN_INTERVAL = timedelta(seconds=15)
+SCAN_INTERVAL = timedelta(seconds=60)
 DOMAIN = "sonoff"
 
 REQUIREMENTS = ['uuid', 'websocket-client']
@@ -35,8 +33,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Required(CONF_PASSWORD): cv.string,
         vol.Optional(CONF_API_REGION, default='eu'): cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
-        vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
-        vol.Optional(CONF_ENTITY_NAME, default=True): cv.boolean,
+        vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int
     }),
 }, extra=vol.ALLOW_EXTRA)
 
@@ -45,125 +42,46 @@ def gen_nonce(length=8):
     return ''.join([str(random.randint(0, 9)) for i in range(length)])
 
 async def async_setup(hass, config):
-    """Set up the eWelink/Sonoff component."""
+    """Setup the eWelink/Sonoff component."""
 
     SCAN_INTERVAL   = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL,'')
 
     _LOGGER.debug("Create the main object")
 
-    # hass.data[DOMAIN] = Sonoff(hass, email, password, api_region, grace_period)
     hass.data[DOMAIN] = Sonoff(hass, config)
 
     for component in ['switch']:
         discovery.load_platform(hass, component, DOMAIN, {}, config)
 
-    # maybe close websocket with this (if it runs)
-    # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].restore_all())
+    # close the websocket when HA stops
+    # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
 
-    def keep_websocket_alive(event_time):
-    #     """Refresh"""     
-    #     _LOGGER.debug("Updating devices status")
+    def update_devices(event_time):
+        run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop )
 
-    #     # @REMINDER figure it out how this works exactly and/or replace it with websocket
-    #     run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
-        run_coroutine_threadsafe( hass.data[DOMAIN].async_websocket_ping(), hass.loop)
-
-    async_track_time_interval(hass, keep_websocket_alive, SCAN_INTERVAL)
+    async_track_time_interval(hass, update_devices, SCAN_INTERVAL)
 
     return True
 
 class Sonoff():
-    # def __init__(self, hass, email, password, api_region, grace_period):
     def __init__(self, hass, config):
-
-        # get email & password from configuration.yaml
-        email           = config.get(DOMAIN, {}).get(CONF_EMAIL,'')
-        password        = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
-        api_region      = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
-        grace_period    = config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,'')
-        entity_name     = config.get(DOMAIN, {}).get(CONF_ENTITY_NAME,'')
-
-        self._email         = email
-        self._password      = password
-        self._api_region    = api_region
-        self._entity_name   = entity_name
-        self._wshost        = None
+        # get config details from from configuration.yaml
+        self._email         = config.get(DOMAIN, {}).get(CONF_EMAIL,'')
+        self._password      = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
+        self._api_region    = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
 
         self._skipped_login = 0
-        self._grace_period  = timedelta(seconds=grace_period)
+        self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
 
-        self._user_apikey   = None
         self._devices       = []
+        self._user_apikey   = None
         self._ws            = None
+        self._wshost        = None
 
         self._hass          = hass
-        self._hass.bus.async_listen('sonoff_state', self.sonoff_state_listener)
+        self._hass.bus.async_listen('sonoff_state', self.state_listener)
 
         self.do_login()
-
-    async def sonoff_state_listener(self, event):
-        # convert from True/False to on/off
-        _LOGGER.warning('received state event from: %s' % event.data['deviceid'])
-
-        new_state = event.data['state']
-        if isinstance(new_state, (bool)):
-            new_state = 'on' if new_state else 'off'
-
-        device = self.get_device(event.data['deviceid'])
-        outlet = event.data['outlet']
-
-        if outlet is not None:
-            _LOGGER.debug("Switching `%s - %s` on outlet %d to state: %s", \
-                device['deviceid'], device['name'] , (outlet+1) , new_state)
-        else:
-            _LOGGER.debug("Switching `%s` to state: %s", device['deviceid'], new_state)
-
-        if not device:
-            _LOGGER.error('unknown device to be updated')
-            return False
-
-        # the payload rule is like this:
-        #   normal device (non-shared) 
-        #       apikey      = login apikey (= device apikey too)
-        #
-        #   shared device
-        #       apikey      = device apikey
-        #       selfApiKey  = login apikey (yes, it's typed corectly selfApikey and not selfApiKey :|)
-
-        if outlet is not None:
-            params = { 'switches' : device['params']['switches'] }
-            params['switches'][outlet]['switch'] = new_state
-
-        else:
-            params = { 'switch' : new_state }
-
-        payload = {
-            'action'        : 'update',
-            'userAgent'     : 'app',
-            'params'        : params,
-            'apikey'        : device['apikey'],
-            'deviceid'      : str(device['deviceid']),
-            'sequence'      : str(time.time()).replace('.',''),
-            'controlType'   : device['params']['controlType'] if 'controlType' in device['params'] else 4,
-            'ts'            : 0
-        }
-
-        # this key is needed for a shared device
-        if device['apikey'] != self.get_user_apikey():
-            payload['selfApikey'] = self.get_user_apikey()
-
-        self.listener.send(json.dumps(payload))
-
-        # @TODO add some sort of validation here, maybe call the devices status 
-        # only IF MAIN STATUS is done over websocket exclusively
-
-        # set also te pseudo-internal state of the device until the real refresh kicks in
-        for idxd, dev in enumerate(self._devices):
-            if dev['deviceid'] == device['deviceid']:
-                if outlet is not None:
-                    self._devices[idxd]['params']['switches'][outlet]['switch'] = new_state
-                else:
-                    self._devices[idxd]['params']['switch'] = new_state
             
     def do_login(self):
         import uuid
@@ -214,19 +132,24 @@ class Sonoff():
             # re-login using the new localized endpoint
             self.do_login()
         else:
+            if 'at' not in resp:
+                _LOGGER.error('Login failed! Please check credentials!')
+                return
+
             self._bearer_token  = resp['at']
             self._user_apikey   = resp['user']['apikey']
             self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
 
             self.update_devices() # to write the devices list 
 
-            # get the websocket host
+            # get/find the websocket host
             if not self._wshost:
                 self.set_wshost()
 
-            self.thread = threading.Thread(target=self.retrieve_pushes)
-            self.thread.daemon = True
-            self.thread.start()
+            if self.get_wshost() is not None:
+                self.thread = threading.Thread(target=self.init_websocket)
+                self.thread.daemon = True
+                self.thread.start()
 
     def set_wshost(self):
         r = requests.post('https://%s-disp.coolkit.cc:8080/dispatch/app' % self._api_region, headers=self._headers)
@@ -236,30 +159,91 @@ class Sonoff():
             self._wshost = resp['domain']
             _LOGGER.info("Found websocket address: %s", self._wshost)
         else:
-            raise Exception('No websocket domain')
+            _LOGGER.error("Couldn't find a valid websocket host, abording Sonoff init")
 
-    def retrieve_pushes(self):
-        """Retrieve_pushes.
+    async def state_listener(self, event):
+        if not self.get_ws().connected:
+            _LOGGER.error('websocket is not connected') 
+            return           
 
-        Spawn a new Listener and links it to self.on_push.
+        _LOGGER.debug('received state event change from: %s' % event.data['deviceid'])
+
+        new_state = event.data['state']
+
+        # convert from True/False to on/off
+        if isinstance(new_state, (bool)):
+            new_state = 'on' if new_state else 'off'
+
+        device = self.get_device(event.data['deviceid'])
+        outlet = event.data['outlet']
+
+        if outlet is not None:
+            _LOGGER.debug("Switching `%s - %s` on outlet %d to state: %s", \
+                device['deviceid'], device['name'] , (outlet+1) , new_state)
+        else:
+            _LOGGER.debug("Switching `%s` to state: %s", device['deviceid'], new_state)
+
+        if not device:
+            _LOGGER.error('unknown device to be updated')
+            return False
+        
         """
-        self.listener = WebsocketListener(wshost=self._wshost, 
-                                            bearer_token=self.get_bearer_token(), 
-                                            user_apikey=self.get_user_apikey(), 
-                                            on_push=self.on_push)
+        the payload rule is like this:
+          normal device (non-shared) 
+              apikey      = login apikey (= device apikey too)
+        
+          shared device
+              apikey      = device apikey
+              selfApiKey  = login apikey (yes, it's typed corectly selfApikey and not selfApiKey :|)
+        """
+        if outlet is not None:
+            params = { 'switches' : device['params']['switches'] }
+            params['switches'][outlet]['switch'] = new_state
 
-        _LOGGER.debug("Getting pushes")
-        try:
-            self.listener.run_forever(ping_interval=30)
-        finally:
-            self.listener.close()
+        else:
+            params = { 'switch' : new_state }
 
-    def on_push(self, data):
-        # ignore pongs
-        if data == 'pong':
-            return
+        payload = {
+            'action'        : 'update',
+            'userAgent'     : 'app',
+            'params'        : params,
+            'apikey'        : device['apikey'],
+            'deviceid'      : str(device['deviceid']),
+            'sequence'      : str(time.time()).replace('.',''),
+            'controlType'   : device['params']['controlType'] if 'controlType' in device['params'] else 4,
+            'ts'            : 0
+        }
 
-        _LOGGER.warning('websocket push: %s', data)
+        # this key is needed for a shared device
+        if device['apikey'] != self.get_user_apikey():
+            payload['selfApikey'] = self.get_user_apikey()
+
+        self.get_ws().send(json.dumps(payload))
+
+        # set also te pseudo-internal state of the device until the real refresh kicks in
+        for idxd, dev in enumerate(self._devices):
+            if dev['deviceid'] == device['deviceid']:
+                if outlet is not None:
+                    self._devices[idxd]['params']['switches'][outlet]['switch'] = new_state
+                else:
+                    self._devices[idxd]['params']['switch'] = new_state
+
+    def init_websocket(self):
+        # keep websocket open indefinitely
+        while True:
+            _LOGGER.debug('(re)init websocket')
+            self._ws = WebsocketListener(sonoff=self, on_message=self.on_message, on_error=self.on_error)
+
+            try:
+                # 145 interval is defined by the first websocket response after login
+                self._ws.run_forever(ping_interval=145)
+            finally:
+                self._ws.close()
+
+    def on_message(self, *args):
+        data = args[-1] # to accomodate the weird behaviour where the function receives 2 or 3 args
+
+        _LOGGER.debug('websocket msg: %s', data)
 
         data = json.loads(data)
         if 'action' in data and data['action'] == 'update' and 'params' in data:
@@ -270,17 +254,15 @@ class Sonoff():
 
                         if 'switches' in data['params']:
                             for switch in data['params']['switches']:
-                                attr = self._hass.states.get('switch.sonoff_%s_%d' % (data['deviceid'], switch['outlet']+1)).attributes
-                                self._hass.states.set('switch.sonoff_%s_%d' % (data['deviceid'], switch['outlet']+1), switch['switch'], attr)    
+                                self.set_entity_state(data['deviceid'], data['params']['switch'], switch['outlet'])    
                         else:
-                            attr = self._hass.states.get('switch.sonoff_%s' % data['deviceid']).attributes
-                            self._hass.states.set('switch.sonoff_%s' % data['deviceid'], data['params']['switch'], attr)
+                            self.set_entity_state(data['deviceid'], data['params']['switch'])
 
-                        break
+                        break # do not remove
 
-
-    async def async_websocket_ping(self):
-        self.listener.send('ping')
+    def on_error(self, *args):
+        error = args[-1] # to accomodate the case when the function receives 2 or 3 args
+        _LOGGER.error('websocket error: %s' % str(error))
 
     def is_grace_period(self):
         grace_time_elapsed = self._skipped_login * int(SCAN_INTERVAL.total_seconds()) 
@@ -291,7 +273,16 @@ class Sonoff():
 
         return grace_status
 
+    def set_entity_state(self, deviceid, state, outlet=None):
+        # @TODO get the names of the outlets (if provided)
+        entity_id = 'switch.%s%s' % (deviceid, str(outlet+1) if outlet else '')
+        attr = self._hass.states.get(entity_id).attributes
+        self._hass.states.set(entity_id, state, attr)
+
     def update_devices(self):
+        if not self.get_wshost(): # login failed check
+            return self._devices
+
         # we are in the grace period, no updates to the devices
         if self._skipped_login and self.is_grace_period():          
             _LOGGER.info("Grace period active")            
@@ -333,38 +324,123 @@ class Sonoff():
     def get_user_apikey(self):
         return self._user_apikey
 
-    def get_entity_name(self):
-        return self._entity_name
+    def get_ws(self):
+        return self._ws
 
-    # async def async_get_devices(self):
-    #     return self.get_devices()
+    def get_wshost(self):
+        return self._wshost
 
     async def async_update(self):
-        # devs = await self.async_get_devices()
-        devices = self.update_devices()       
+        devices = self.update_devices()  
+
+    def get_outlets(self, device):
+        # information found in ewelink app source code
+        name_to_outlets = {
+            'SOCKET'                : 1,
+            'SWITCH_CHANGE'         : 1,
+            'GSM_UNLIMIT_SOCKET'    : 1,
+            'SWITCH'                : 1,
+            'THERMOSTAT'            : 1,
+            'SOCKET_POWER'          : 1,
+            'GSM_SOCKET'            : 1,
+            'POWER_DETECTION_SOCKET': 1,
+            'SOCKET_2'              : 2,
+            'GSM_SOCKET_2'          : 2,
+            'SWITCH_2'              : 2,
+            'SOCKET_3'              : 3,
+            'GSM_SOCKET_3'          : 3,
+            'SWITCH_3'              : 3,
+            'SOCKET_4'              : 4,
+            'GSM_SOCKET_4'          : 4,
+            'SWITCH_4'              : 4,
+            'CUN_YOU_DOOR'          : 4
+        }
+
+        uiid_to_name = {
+            1       : "SOCKET",
+            2       : "SOCKET_2",
+            3       : "SOCKET_3",
+            4       : "SOCKET_4",
+            5       : "SOCKET_POWER",
+            6       : "SWITCH",
+            7       : "SWITCH_2",
+            8       : "SWITCH_3",
+            9       : "SWITCH_4",
+            10      : "OSPF",
+            11      : "CURTAIN",
+            12      : "EW-RE",
+            13      : "FIREPLACE",
+            14      : "SWITCH_CHANGE",
+            15      : "THERMOSTAT",
+            16      : "COLD_WARM_LED",
+            17      : "THREE_GEAR_FAN",
+            18      : "SENSORS_CENTER",
+            19      : "HUMIDIFIER",
+            22      : "RGB_BALL_LIGHT",
+            23      : "NEST_THERMOSTAT",
+            24      : "GSM_SOCKET",
+            25      : 'AROMATHERAPY',
+            26      : "RuiMiTeWenKongQi",
+            27      : "GSM_UNLIMIT_SOCKET",
+            28      : "RF_BRIDGE",
+            29      : "GSM_SOCKET_2",
+            30      : "GSM_SOCKET_3",
+            31      : "GSM_SOCKET_4",
+            32      : "POWER_DETECTION_SOCKET",
+            33      : "LIGHT_BELT",
+            34      : "FAN_LIGHT",
+            35      : "EZVIZ_CAMERA",
+            36      : "SINGLE_CHANNEL_DIMMER_SWITCH",
+            38      : "HOME_KIT_BRIDGE",
+            40      : "FUJIN_OPS",
+            41      : "CUN_YOU_DOOR",
+            42      : "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT",
+            43      : "",
+            44      : "",
+            45      : "DOWN_CEILING_LIGHT",
+            46      : "AIR_CLEANER",
+            49      : "MACHINE_BED",
+            51      : "COLD_WARM_DESK_LIGHT",
+            52      : "DOUBLE_COLOR_DEMO_LIGHT",
+            53      : "ELECTRIC_FAN_WITH_LAMP",
+            55      : "SWEEPING_ROBOT",
+            56      : "RGB_BALL_LIGHT_4",
+            57      : "MONOCHROMATIC_BALL_LIGHT",
+            59      : "MUSIC_LIGHT_BELT",
+            60      : "NEW_HUMIDIFIER",
+            61      : "KAI_WEI_ROUTER",
+            62      : "MEARICAMERA",
+            66      : "ZIGBEE_MAIN_DEVICE",
+            67      : "RollingDoor",
+            68      : "KOOCHUWAH",
+            1001    : "BLADELESS_FAN",
+            1003    : "WARM_AIR_BLOWER",
+            1000    : "ZIGBEE_SINGLE_SWITCH",
+            1770    : "ZIGBEE_TEMPERATURE_SENSOR",
+            1256    : "ZIGBEE_LIGHT"
+        }
+
+        if device['uiid'] in uiid_to_name.keys() and \
+            uiid_to_name[device['uiid']] in name_to_outlets.keys():
+            return name_to_outlets[uiid_to_name[device['uiid']]]
+
+        return None
   
 class WebsocketListener(threading.Thread, websocket.WebSocketApp):
-    def __init__(self, wshost, bearer_token, user_apikey, on_push=None, on_error=None):
-
-        self.on_error = on_error
-
-        self._wshost = wshost
-        self._bearer_token = bearer_token
-        self._user_apikey = user_apikey
+    def __init__(self, sonoff, on_message=None, on_error=None):
+        self._sonoff        = sonoff
 
         threading.Thread.__init__(self)
-        websocket.WebSocketApp.__init__(self, 'wss://{}:8080/api/ws'.format(self._wshost),
+        websocket.WebSocketApp.__init__(self, 'wss://{}:8080/api/ws'.format(self._sonoff.get_wshost()),
                                         on_open=self.on_open,
-                                        on_error=self.on_error,
-                                        on_message=self.on_message,
+                                        on_error=on_error,
+                                        on_message=on_message,
                                         on_close=self.on_close)
 
         self.connected = False
         self.last_update = time.time()
 
-        self.on_push = on_push
-
-    def on_open(self):
+    def on_open(self, *args):
         self.connected = True
         self.last_update = time.time()
 
@@ -375,8 +451,8 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
             'nonce'     : gen_nonce(15),
             'apkVesrion': "1.8",
             'os'        : 'ios',
-            'at'        : self._bearer_token,
-            'apikey'    : self._user_apikey,
+            'at'        : self._sonoff.get_bearer_token(),
+            'apikey'    : self._sonoff.get_user_apikey(),
             'ts'        : str(int(time.time())),
             'model'     : 'iPhone10,6',
             'romVersion': '11.1.2',
@@ -385,39 +461,25 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
 
         self.send(json.dumps(payload))
 
-    def on_close(self):
+    def on_close(self, *args):
         # log.debug('Listener closed')
+        _LOGGER.error('---- sonoff ws closed ---- ')
         self.connected = False
 
-    def on_message(self, message):
-        # _LOGGER.warning('Message received:' + message)
-        self.on_push(message)
-        # try:
-        #     json_message = json.loads(message)
-        #     if json_message["type"] != "nop":
-        #         self.on_push(json_message)
-        # except Exception as e:
-        #     logging.exception(e)
-
     def run_forever(self, sockopt=None, sslopt=None, ping_interval=0, ping_timeout=None):
-        websocket.WebSocketApp.run_forever(self, sockopt=sockopt, sslopt=sslopt, ping_interval=ping_interval,
-                                           ping_timeout=ping_timeout)
-
-    def run(self):
-        self.run_forever()
+        websocket.WebSocketApp.run_forever( self, 
+                                            sockopt=sockopt, 
+                                            sslopt=sslopt, 
+                                            ping_interval=ping_interval,
+                                            ping_timeout=ping_timeout)
 
 class SonoffDevice(Entity):
     """Representation of a Sonoff device"""
 
     def __init__(self, hass, device, outlet = None):
         """Initialize the device."""
-
         self._hass          = hass
-        # self._name          = '{}{}'.format(
-        #                         device['name'] if self._hass.data[DOMAIN].get_entity_name() else device['deviceid'],
-        #                         '' if outlet is None else ' '+str(outlet+1))
-
-        self._name          = '{}{}'.format(device['deviceid'], '' if outlet is None else ' '+str(outlet+1))
+        self._name          = '{}{}'.format(device['name'], '' if outlet is None else (' %s' % str(outlet+1)) )
         self._deviceid      = device['deviceid']
         self._available     = device['online']
         self._outlet        = outlet 
@@ -457,7 +519,7 @@ class SonoffDevice(Entity):
     @property
     def should_poll(self):
         """Return the polling state."""
-        return False
+        return True
 
     @property
     def name(self):
