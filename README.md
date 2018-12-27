@@ -48,6 +48,7 @@ This is just a proof of concept because I searched for it and there was no imple
 | [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G)         |    yes    |        |       |    yes    |  Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app)                              |
 | [1 Gang Generic Wall Switch](https://www.aliexpress.com/item/1-Gang-US-EU-UK-Plug-Wall-Wifi-Light-Switch-Smart-Touch-LED-Lights-Switch-for/32934184095.html)         |    yes    |        |       |    yes    |  Manfufacturer: KingART, Model: KING-N1 (according to ewelink app), Chip: PSF-B85 (ESP8285)                             |
 | WHDTS WiFi Momentary Inching Relay |    yes    |        |          |        | displayed as a switch button |
+| [Sonoff S26](https://www.aliexpress.com/item/Sonoff-S26-WiFi-Smart-Socket-Wireless-Plug-Power-Socket-Smart-Home-Switch-Smart-Remote-Control-for/32956551752.html)                         |    yes    |        |          |   yes  |  Version: Euro                            |
 
 `yes` = confirmed version, [empty] = unknown for sure 
 
