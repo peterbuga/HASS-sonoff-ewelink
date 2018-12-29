@@ -54,6 +54,9 @@ async def async_setup(hass, config):
     for component in ['switch']:
         discovery.load_platform(hass, component, DOMAIN, {}, config)
 
+    for component in ['sensor']:
+        discovery.load_platform(hass, component, DOMAIN, {}, config)
+
     def update_devices(event_time):
         """Refresh"""     
         _LOGGER.debug("Updating devices status")
