@@ -51,10 +51,7 @@ async def async_setup(hass, config):
     # hass.data[DOMAIN] = Sonoff(hass, email, password, api_region, grace_period)
     hass.data[DOMAIN] = Sonoff(config)
 
-    for component in ['switch']:
-        discovery.load_platform(hass, component, DOMAIN, {}, config)
-
-    for component in ['sensor']:
+    for component in ['switch', 'sensor']:
         discovery.load_platform(hass, component, DOMAIN, {}, config)
 
     def update_devices(event_time):
