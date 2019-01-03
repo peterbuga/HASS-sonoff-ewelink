@@ -528,6 +528,25 @@ class SonoffDevice(Entity):
     def get_state(self):
         device = self.get_device()
 
+        # Pow & Pow R2:
+        if 'power' in device['params']: 
+            self._attributes['power'] = device['params']['power']
+        
+        # Pow R2 only:
+        if 'current' in device['params']: 
+            self._attributes['current'] = device['params']['current']
+        if 'voltage' in device['params']: 
+            self._attributes['voltage'] = device['params']['voltage']
+
+        # TH10/TH16
+        if 'currentHumidity' in device['params'] and device['params']['currentHumidity'] != "unavailable":
+            self._attributes['humidity'] = device['params']['currentHumidity']
+        if 'currentTemperature' in device['params'] and device['params']['currentTemperature'] != "unavailable":
+            self._attributes['temperature'] = device['params']['currentTemperature']
+
+        if 'rssi' in device['params']:
+            self._attributes['rssi'] = device['params']['rssi']            
+
         # the device has more switches
         if self._outlet is not None:
             return device['params']['switches'][self._outlet]['switch'] == 'on' if device else False

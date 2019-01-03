@@ -51,7 +51,6 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
     @property
     def entity_id(self):
         """Return the unique id of the switch."""
-        
         entity_id = "{}.{}".format(DOMAIN, self._deviceid)
 
         if self._outlet is not None:
