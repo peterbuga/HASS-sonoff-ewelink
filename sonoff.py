@@ -360,16 +360,18 @@ class Sonoff():
         return new_state
 
 class SonoffDevice(Entity):
-    """Representation of a Sonoff device"""
+    """Representation of a Sonoff entity"""
 
-    def __init__(self, hass, device, outlet = None):
+    def __init__(self, hass, device):
         """Initialize the device."""
 
+        self._outlet        = None
+        self._sensor        = None
+        self._state         = None
+
         self._hass          = hass
-        self._name          = '{}{}'.format(device['name'], '' if outlet is None else ' '+str(outlet+1))
         self._deviceid      = device['deviceid']
         self._available     = device['online']
-        self._outlet        = outlet 
 
         self._attributes    = {
             'device_id'     : self._deviceid
@@ -433,12 +435,6 @@ class SonoffDevice(Entity):
         return self._name
 
     @property
-    def is_on(self):
-        """Return true if device is on."""
-        self._state = self.get_state()
-        return self._state
-
-    @property
     def available(self):
         """Return true if device is online."""
         return self.get_available()
@@ -450,16 +446,6 @@ class SonoffDevice(Entity):
         # we don't update here because there's 1 single thread that can be active at anytime
         # i.e. eWeLink API allows only 1 active session
         pass
-
-    def turn_on(self, **kwargs):
-        """Turn the device on."""
-        self._state = self._hass.data[DOMAIN].switch(True, self._deviceid, self._outlet)
-        self.schedule_update_ha_state()
-
-    def turn_off(self, **kwargs):
-        """Turn the device off."""
-        self._state = self._hass.data[DOMAIN].switch(False, self._deviceid, self._outlet)
-        self.schedule_update_ha_state()
 
     @property
     def device_state_attributes(self):

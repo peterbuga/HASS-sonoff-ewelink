@@ -1,5 +1,5 @@
-# Home Assistant component for original firmware Sonoff / eWeLink switches
-Simple Home Assistant component to add/control Sonoff/eWeLink smart switches using the stock firmware and cloud capabilities.
+# Home Assistant component for original firmware Sonoff / eWeLink smart devices
+Simple Home Assistant component to add/control Sonoff/eWeLink smart devices using the stock firmware and retaining the cloud capabilities.
 
 ***
 ### WARNING: completely deactivate the `sonoff` component from HA while doing a firmware update, due to auto-relogin function you might be kicked out of the app before the process is completed. I would not be held liable for any problems occuring if not following this steps!
@@ -24,9 +24,11 @@ And copy the *.py files in `custom_components` folder using the same structure l
     ├── sonoff.py
     └── switch
         └── sonoff.py
+    └── sensor
+        └── sonoff.py
 ```
 
-`email` [Deprecated] only for compatibility, may be eliminated in future.
+`email` [Deprecated] used only for compatibility, may be eliminated in future.
 
 `username` the username that you registered for ewelink account be it an email or a phone number (the phone number should lead with region number, '+8612345678901' for example).
 
@@ -34,7 +36,7 @@ And copy the *.py files in `custom_components` folder using the same structure l
 
 `grace_period` eWeLink app allows **only one active session at a time**, therefore this will temporarily block HA refreshes for the specified amount (in seconds) to allow (or better said **after**) you to login in the app and do required changes to your devices. following that sonoff component does an internal re-login invalidating the mobile session and the process restarts. (as a workaround for this, you can create a 2nd account and share the devices from main one, therefore one will be used in HA another one in mobile app)
 
-`api_region` this component tries to find, login & connect to the proper region assigned to you. specifying a proper region will help the component to load faster and reconnect after the expired grace period explained above, possible values: `eu` (default), `us` and `cn`
+`api_region` this component tries to find, login & connect to the proper region assigned to you. specifying a proper region will help the component to load faster and reconnect after the expired grace period explained above, possible values: `eu` (default), `us` or `cn`
 
 This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (althought I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
 
