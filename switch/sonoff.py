@@ -50,12 +50,12 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
 
     def turn_on(self, **kwargs):
         """Turn the device on."""
-        self._state = self._hass.data[DOMAIN].switch(True, self._deviceid, self._outlet)
+        self._state = self._hass.data[SONOFF_DOMAIN].switch(True, self._deviceid, self._outlet)
         self.schedule_update_ha_state()
 
     def turn_off(self, **kwargs):
         """Turn the device off."""
-        self._state = self._hass.data[DOMAIN].switch(False, self._deviceid, self._outlet)
+        self._state = self._hass.data[SONOFF_DOMAIN].switch(False, self._deviceid, self._outlet)
         self.schedule_update_ha_state()
 
     # entity id is required if the name use other characters not in ascii
