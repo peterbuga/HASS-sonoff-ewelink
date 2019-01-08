@@ -47,13 +47,12 @@ async def async_setup(hass, config):
     _LOGGER.debug("Create the main object")
 
     hass.data[DOMAIN] = Sonoff(hass, config)
-    
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
-        for component in ['switch']:
-            discovery.load_platform(hass, component, DOMAIN, {}, config)
-       
-        hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
 
+        for component in ['switch','sensor']:
+            discovery.load_platform(hass, component, DOMAIN, {}, config)
+        hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
+	
         # close the websocket when HA stops
         # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
 
@@ -140,12 +139,15 @@ class Sonoff():
 
             # re-login using the new localized endpoint
             self.do_login()
+            return
 
         elif 'error' in resp and resp['error'] in [HTTP_NOT_FOUND, HTTP_BAD_REQUEST]:
             # (most likely) login with +86... phone number and region != cn
             if '@' not in self._username and self._api_region != 'cn':
                 self._api_region = 'cn'
                 self.do_login()
+                return
+            
             else:
                 _LOGGER.error("Couldn't authenticate using the provided credentials!")
 
@@ -489,13 +491,17 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
 class SonoffDevice(Entity):
     """Representation of a Sonoff device"""
 
-    def __init__(self, hass, device, outlet = None):
+    def __init__(self, hass, device):
         """Initialize the device."""
+
+        self._outlet        = None
+        self._sensor        = None
+        self._state         = None
 
         self._hass          = hass
         self._deviceid      = device['deviceid']
         self._available     = device['online']
-        self._outlet        = outlet
+
         self._attributes    = {
             'device_id'     : self._deviceid,
         }
@@ -570,12 +576,6 @@ class SonoffDevice(Entity):
         return self._name
 
     @property
-    def is_on(self):
-        """Return true if device is on."""
-        self._state = self.get_state()
-        return self._state
-
-    @property
     def available(self):
         """Return true if device is online."""
         return self.get_available()
@@ -588,23 +588,6 @@ class SonoffDevice(Entity):
         # and the websocket will send the state update messages
         pass
 
-    def turn_on(self, **kwargs):
-        """Turn the device on."""
-        self._hass.bus.async_fire('sonoff_state', {
-            'state'     : True,
-            'deviceid'  : self._deviceid,
-            'outlet'    : self._outlet
-        })
-        self.async_schedule_update_ha_state()
-
-    def turn_off(self, **kwargs):
-        """Turn the device off."""
-        self._hass.bus.async_fire('sonoff_state', {
-            'state'     : False,
-            'deviceid'  : self._deviceid,
-            'outlet'    : self._outlet
-        })
-        self.async_schedule_update_ha_state()
 
     @property
     def device_state_attributes(self):

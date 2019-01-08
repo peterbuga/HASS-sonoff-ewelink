@@ -1,11 +1,8 @@
-# The domain of your component. Should be equal to the name of your component.
 import logging, time, json
 
 from homeassistant.components.switch import SwitchDevice
 from homeassistant.components.switch import DOMAIN
-#from homeassistant.util import Throttle
-
-# from homeassistant.components.sonoff import (DOMAIN, SonoffDevice)
+# from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 
 _LOGGER = logging.getLogger(__name__)
@@ -14,7 +11,6 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     """Add the Sonoff Switch entities"""
  
     entities = []
-
     for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = True):
         outlets_number = hass.data[SONOFF_DOMAIN].get_outlets(device)
 
@@ -45,8 +41,34 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
         """Initialize the device."""
 
         # add switch unique stuff here if needed
-        SonoffDevice.__init__(self, hass, device, outlet)
-	
+        SonoffDevice.__init__(self, hass, device)
+        self._outlet = outlet
+        self._name   = '{}{}'.format(device['name'], '' if outlet is None else ' '+str(outlet+1))
+
+    @property
+    def is_on(self):
+        """Return true if device is on."""
+        self._state = self.get_state()
+        return self._state
+
+    def turn_on(self, **kwargs):
+        """Turn the device on."""
+        self._hass.bus.async_fire('sonoff_state', {
+            'state'     : True,
+            'deviceid'  : self._deviceid,
+            'outlet'    : self._outlet
+        })
+        self.async_schedule_update_ha_state()
+
+    def turn_off(self, **kwargs):
+        """Turn the device off."""
+        self._hass.bus.async_fire('sonoff_state', {
+            'state'     : False,
+            'deviceid'  : self._deviceid,
+            'outlet'    : self._outlet
+        })
+        self.async_schedule_update_ha_state()
+
     # entity id is required if the name use other characters not in ascii
     @property
     def entity_id(self):

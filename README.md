@@ -1,5 +1,5 @@
-# Home Assistant component for original firmware Sonoff / eWeLink switches
-Simple Home Assistant component to add/control Sonoff/eWeLink smart switches using the stock firmware and cloud capabilities.
+# Home Assistant component for original firmware Sonoff / eWeLink smart devices
+Simple Home Assistant component to add/control Sonoff/eWeLink smart devices using the stock firmware and retaining the cloud capabilities.
 
 ***
 ### WARNING: completely deactivate the `sonoff` component from HA while doing a firmware update, due to auto-relogin function you might be kicked out of the app before the process is completed. I would not be held liable for any problems occuring if not following this steps!
@@ -24,9 +24,11 @@ And copy the *.py files in `custom_components` folder using the same structure l
     ├── sonoff.py
     └── switch
         └── sonoff.py
+    └── sensor
+        └── sonoff.py
 ```
 
-`email` [Deprecated] only for compatibility, may be eliminated in future.
+`email` [Deprecated] used only for compatibility, may be eliminated in future.
 
 `username` the username that you registered for ewelink account be it an email or a phone number (the phone number should lead with region number, '+8612345678901' for example).
 
@@ -34,41 +36,45 @@ And copy the *.py files in `custom_components` folder using the same structure l
 
 `grace_period` eWeLink app allows **only one active session at a time**, therefore this will temporarily block HA refreshes for the specified amount (in seconds) to allow (or better said **after**) you to login in the app and do required changes to your devices. following that sonoff component does an internal re-login invalidating the mobile session and the process restarts. (as a workaround for this, you can create a 2nd account and share the devices from main one, therefore one will be used in HA another one in mobile app)
 
-`api_region` this component tries to find, login & connect to the proper region assigned to you. specifying a proper region will help the component to load faster and reconnect after the expired grace period explained above, possible values: `eu` (default), `us` and `cn`
+`api_region` this component tries to find, login & connect to the proper region assigned to you. specifying a proper region will help the component to load faster and reconnect after the expired grace period explained above, possible values: `eu` (default), `us` or `cn`
 
 This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (althought I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
 
 
 ## Compatibility list
-| Model | Supported | Fw 1.6 | Fw 1.8.1 | Fw 2.6 | Fw 2.7.1 | Remarks |
-|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:------:|:--------:|:------:|:--------:|--------------------------------------------------------------------------------------------|
-| Sonoff Basic | yes | yes | yes | yes |  |  |
-| Sonoff Dual | yes |  |  |  |  |  |
-| Sonoff G1 | unknown |  |  |  |  |  |
-| Sonoff 4CH Pro (R2) | yes |  |  | yes |  |  |
-| Sonoff S20 | yes |  | yes |  |  |  |
-| Sonoff S31 | yes |  |  |  |  | only switch operation |
-| [Sonoff S26](https://www.aliexpress.com/item/Sonoff-S26-WiFi-Smart-Socket-Wireless-Plug-Power-Socket-Smart-Home-Switch-Smart-Remote-Control-for/32956551752.html) | yes |  |  | yes |  | version: Euro |
-| Sonoff T1 1C | yes |  |  | yes |  |  |
-| Sonoff T1 EU 2C | yes |  |  |  | yes |  |
-| Sonoff T1 UK 3C | yes |  |  | yes | yes | adds 4 switches, last needs to be hidden via customisation |
-| Sonoff T1 US 3C | yes |  |  |  |  |  |
-| Sonoff Pow | yes |  |  |  |  | only switch operation |
-| Sonoff Pow R2 | yes |  |  |  |  | only switch operation |
-| Sonoff TH10/TH16 | yes |  |  |  |  | only switch operation |
-| Sonoff iFan02 | yes |  |  |  |  | it creates 4 switches, 1 for the light and 3 for the various fan speeds |
-| Sonoff HT-TH31 | unknown |  |  |  |  |  |
-| [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G) | yes |  |  | yes |  | Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app) |
-| [1 Gang Generic Wall Switch](https://www.aliexpress.com/item/1-Gang-US-EU-UK-Plug-Wall-Wifi-Light-Switch-Smart-Touch-LED-Lights-Switch-for/32934184095.html) | yes |  |  | yes |  | manfufacturer: KingART, model: KING-N1 (according to ewelink app), Chip: PSF-B85 (ESP8285) |
-| WHDTS WiFi Momentary Inching Relay | yes |  |  |  |  | displayed as a switch button |
-| [MHCOZY WiFi Wireless 5V/12V](https://www.amazon.com/gp/product/B07CJ6DSQC/ref=oh_aui_search_detailpage?ie=UTF8&psc=1) | yes |  |  |  |  |  |
-| [Geekcreit 2 Channel AC 85V-250V](https://www.ebay.es/itm/Geekcreit-2-Channel-AC-85V-250V-APP-Remote-Control-WIFI-Wireless-Switch-Socket-F-/162844446103) | yes |  |  |  | yes |  |
-| [Smart Wi-Fi Outlet](https://www.amazon.com/gp/product/B073VK9X49/ref=oh_aui_detailpage_o01_s01?ie=UTF8&psc=1) | yes |  |  |  |  |  |
+| Model | Supported | 1.6 | 1.8.1 | 2.6 | 2.6.1 | 2.7.1 | Remarks |
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:---:|:-----:|:---:|-------|:-----:|--------------------------------------------------------------------------------------------|
+| Sonoff Basic | yes | yes | yes | yes |  |  |  |
+| Sonoff Dual | yes |  |  |  |  |  |  |
+| Sonoff RF | yes |  |  |  | yes |  |  |
+| Sonoff G1 | ? |  |  |  |  |  |  |
+| Sonoff 4CH Pro | yes |  |  | yes |  | yes |  |
+| Sonoff 4CH Pro R2 | yes |  |  | yes |  |  |  |
+| Sonoff S20 | yes |  | yes |  |  |  |  |
+| Sonoff S31 | yes |  |  |  |  |  | only switch operation |
+| [Sonoff S26](https://www.aliexpress.com/item/Sonoff-S26-WiFi-Smart-Socket-Wireless-Plug-Power-Socket-Smart-Home-Switch-Smart-Remote-Control-for/32956551752.html) | yes |  |  | yes |  |  | version: Euro |
+| Sonoff T1 1C | yes |  |  | yes |  |  |  |
+| Sonoff T1 EU 2C | yes |  |  |  |  | yes |  |
+| Sonoff T1 UK 3C | yes |  |  | yes |  | yes |  |
+| Sonoff T1 US 3C | yes |  |  |  |  |  |  |
+| Sonoff Pow | yes |  |  |  |  |  | + power sensor |
+| Sonoff Pow R2 | yes |  |  |  |  |  | + power/current/voltage sensors |
+| Sonoff TH10/TH16 | yes |  |  |  |  |  | + temp/humidity sensors |
+| Sonoff iFan02 | yes |  |  |  |  |  | it creates 4 switches, 1 for the light and 3 for the various fan speeds |
+| Sonoff HT-TH31 | ? |  |  |  |  |  |  |
+| [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G) | yes |  |  | yes |  |  | Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app) |
+| [1 Gang Generic Wall Switch](https://www.aliexpress.com/item/1-Gang-US-EU-UK-Plug-Wall-Wifi-Light-Switch-Smart-Touch-LED-Lights-Switch-for/32934184095.html) | yes |  |  | yes |  |  | manfufacturer: KingART, model: KING-N1 (according to ewelink app), Chip: PSF-B85 (ESP8285) |
+| WHDTS WiFi Momentary Inching Relay | yes |  |  |  |  |  | displayed as a switch button |
+| [MHCOZY WiFi Wireless 5V/12V](https://www.amazon.com/gp/product/B07CJ6DSQC/ref=oh_aui_search_detailpage?ie=UTF8&psc=1) | yes |  |  |  |  |  |  |
+| [Geekcreit 2 Channel AC 85V-250V](https://www.ebay.es/itm/Geekcreit-2-Channel-AC-85V-250V-APP-Remote-Control-WIFI-Wireless-Switch-Socket-F-/162844446103) | yes |  |  |  |  | yes |  |
+| [Smart Wi-Fi Outlet](https://www.amazon.com/gp/product/B073VK9X49/ref=oh_aui_detailpage_o01_s01?ie=UTF8&psc=1) | yes |  |  |  |  |  |  |
 
 `yes` = confirmed version, [empty] = unknown for sure 
 
 ## Updates
-- 2018.12.5 
+- 2019.01.06
+  - create sensors for devices that have support for power/current/voltate/temperature/humidity
+- 2018.12.05 
   - mandarin phone number login support
   - removed `entity_name` option, the entities will have a fixed structure from now on
 - 2018.12.01
