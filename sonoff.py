@@ -321,7 +321,10 @@ class Sonoff():
             params['switches'][outlet]['switch'] = new_state
 
         else:
-            params = { 'switch' : new_state }
+            # in most of the switches is params.switch
+            # for ligts is params.state
+            state_key = 'state' if 'state' in device['params'] else 'switch' 
+            params = { state_key : new_state }
 
         payload = {
             'action'        : 'update',
@@ -351,7 +354,7 @@ class Sonoff():
                 if outlet is not None:
                     self._devices[idx]['params']['switches'][outlet]['switch'] = new_state
                 else:
-                    self._devices[idx]['params']['switch'] = new_state
+                    self._devices[idx]['params'][state_key] = new_state
 
 
         # @TODO add some sort of validation here, maybe call the devices status 
@@ -411,7 +414,8 @@ class SonoffDevice(Entity):
             return device['params']['switches'][self._outlet]['switch'] == 'on' if device else False
 
         else:
-            return device['params']['switch'] == 'on' if device else False
+            state_key = 'state' if 'state' in device['params'] else 'switch' 
+            return device['params'][state_key] == 'on' if device else False
 
     def get_available(self):
         device = self.get_device()
