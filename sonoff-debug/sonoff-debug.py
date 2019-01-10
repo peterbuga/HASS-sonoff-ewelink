@@ -82,11 +82,11 @@ def get_devices():
 	return json.dumps(devices, indent=2, sort_keys=True)
 
 def clean_data(data):
-	data = re.sub(r'"phoneNumber": ".*"', '"phoneNumber": "[hidden]"', data)
-	data = re.sub(r'"name": ".*"', '"name": "[hidden]"', data)
-	data = re.sub(r'"ip": ".*",', '"ip": "[hidden]"', data)
-	data = re.sub(r'"deviceid": ".*",', '"deviceid": "[hidden]"', data)
-	data = re.sub(r'"_id": ".*",', '"_id": "[hidden]"', data)
+	data = re.sub(r'"phoneNumber": ".*"', '"phoneNumber": "[hidden]",', data)
+	data = re.sub(r'"name": ".*"', '"name": "[hidden]",', data)
+	data = re.sub(r'"ip": ".*",', '"ip": "[hidden]",', data)
+	data = re.sub(r'"deviceid": ".*",', '"deviceid": "[hidden]",', data)
+	data = re.sub(r'"_id": ".*",', '"_id": "[hidden]",', data)
 	data = re.sub(r'"\w{2}:\w{2}:\w{2}:\w{2}:\w{2}:\w{2}"', '"xx:xx:xx:xx:xx:xx"', data)
 	data = re.sub(r'"\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"', '"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"', data)
 	data = re.sub(r'"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z"', '"xxxx-xx-xxxxx:xx:xx.xxx"', data)
