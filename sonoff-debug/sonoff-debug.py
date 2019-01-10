@@ -19,7 +19,7 @@ else:
 		password 	= args.password
 
 	else:
-		print 'Please read the instructions better!'
+		print('Please read the instructions better!')
 		sys.exit(1)
 
 def gen_nonce(length=8):
@@ -88,5 +88,5 @@ def clean_data(data):
 if __name__ == "__main__":
 	do_login()
 	devices_json = get_devices()
-	print clean_data(devices_json)
+	print(clean_data(devices_json))
 
