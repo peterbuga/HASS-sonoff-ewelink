@@ -25,7 +25,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 entities.append(entity)
         
         # normal device = Sonoff Basic (and alike)
-        else:
+        elif 'switch' in device['params'] or 'state' in device['params']: #ignore devices like Sonoff RF bridge
             entity = SonoffSwitch(hass, device)
             entities.append(entity)    
 
