@@ -33,7 +33,6 @@ api_region='us'
 def do_login():
 	global api_region
 
-	decryptedAppSecret = '6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
 	
 	app_details = {
 		'email'     : email,
@@ -49,7 +48,15 @@ def do_login():
 		'appVersion': '3.5.3'
 	}
 
-	hex_dig = hmac.new(decryptedAppSecret, json.dumps(app_details), digestmod=hashlib.sha256).digest()
+	try:
+		#python3.6+
+		decryptedAppSecret = b'6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
+		hex_dig = hmac.new(decryptedAppSecret, json.dumps(app_details), digestmod=hashlib.sha256).digest()
+	except:
+		#python2.7
+		decryptedAppSecret = '6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
+		hex_dig = hmac.new(decryptedAppSecret, json.dumps(app_details), digestmod=hashlib.sha256).digest()
+
 	sign = base64.b64encode(hex_dig).decode()
 
 	headers.update({'Authorization' : 'Sign ' + sign})
