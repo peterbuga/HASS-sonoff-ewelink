@@ -8,15 +8,15 @@ Under no circumstances I'm not using this script to capture any emails or passwo
 
 To run this it just, `cd` to the location of the script and:
 
-`python sonoff-debug.py 'email@used.com' 'password'` > devices.json 
+`python sonoff-debug.py 'email or phone-number username' 'password'` > devices.json 
 
 OR
 
-`python sonoff-debug.py --email='email@used.com' --password='password'` > devices.json 
+`python sonoff-debug.py --username='email or phone-number username' --password='password'` > devices.json 
 
 OR
 
-`python sonoff-debug.py -e 'email@used.com' -p 'password'` > devices.json
+`python sonoff-debug.py -u 'email or phone-number username' -p 'password'` > devices.json
 
 **This script can be ran from any place/computer that has the required modules installed (google how to install the missing ones, it's out of the scope of this repo) meaning it's not mandatory to have HA installation to run it.** 
 

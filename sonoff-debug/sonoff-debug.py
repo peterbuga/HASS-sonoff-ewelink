@@ -3,19 +3,19 @@ import argparse, sys, json, time, random, pprint, base64, requests, hmac, hashli
 
 # named params	
 if not sys.argv[1].startswith('-') and not sys.argv[2].startswith('-'):
-	email 		= sys.argv[1]
+	username	= sys.argv[1]
 	password 	= sys.argv[2]
 
 else:
 	parser=argparse.ArgumentParser()
-	parser.add_argument('-e', '--email', 		help='email used for eWeLink app')
+	parser.add_argument('-u', '--username', 	help='email/phone number used to login in eWeLink app')
 	parser.add_argument('-p', '--password', 	help='password for email/account')
 
 	args=parser.parse_args()
 
 	# positional params
 	if hasattr(args, 'email') and hasattr(args, 'password'):
-		email 		= args.email
+		username	= args.username
 		password 	= args.password
 
 	else:
@@ -35,7 +35,6 @@ def do_login():
 
 	
 	app_details = {
-		'email'     : email,
 		'password'  : password,
 		'version'   : '6',
 		'ts'        : int(time.time()),
@@ -47,6 +46,11 @@ def do_login():
 		'romVersion': '11.1.2',
 		'appVersion': '3.5.3'
 	}
+
+	if '@' not in username:
+		app_details['phoneNumber'] = username
+	else:
+		app_details['email'] = username
 
 	try:
 		#python3.6+
