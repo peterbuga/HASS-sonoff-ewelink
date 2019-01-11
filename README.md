@@ -73,7 +73,7 @@ This is just a proof of concept because I searched for it and there was no imple
 
 ## Updates
 - 2019.01.06
-  - create sensors for devices that have support for power/current/voltate/temperature/humidity
+  - create sensors for devices that have support for power/current/voltage/temperature/humidity
 - 2018.12.05 
   - mandarin phone number login support
   - removed `entity_name` option, the entities will have a fixed structure from now on
