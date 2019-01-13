@@ -14,7 +14,7 @@ else:
 	args=parser.parse_args()
 
 	# positional params
-	if hasattr(args, 'email') and hasattr(args, 'password'):
+	if hasattr(args, 'username') and hasattr(args, 'password'):
 		username	= args.username
 		password 	= args.password
 
