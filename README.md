@@ -44,7 +44,7 @@ This is just a proof of concept because I searched for it and there was no imple
 ## Compatibility list
 | Model | Supported | 1.6 | 1.8.1 | 2.6 | 2.6.1 | 2.7.1 | Remarks |
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:---:|:-----:|:---:|-------|:-----:|--------------------------------------------------------------------------------------------|
-| Sonoff Basic | yes | yes | yes | yes |  |  |  |
+| Sonoff Basic | yes | yes | yes | yes | yes |  |  |
 | Sonoff Dual | yes |  |  |  |  |  |  |
 | Sonoff RF | yes |  |  |  | yes |  |  |
 | Sonoff G1 | ? |  |  |  |  |  |  |
@@ -62,6 +62,7 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff TH10/TH16 | yes |  |  |  |  |  | + temp/humidity sensors |
 | Sonoff iFan02 | yes |  |  |  |  |  | it creates 4 switches, 1 for the light and 3 for the various fan speeds |
 | Sonoff HT-TH31 | ? |  |  |  |  |  |  |
+| [Sonoff Slampher RF](https://www.gearbest.com/smart-light-bulb/pp_1824903.html) | yes |  |  |  |  | yes |  |
 | [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G) | yes |  |  | yes |  |  | Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app) |
 | [1 Gang Generic Wall Switch](https://www.aliexpress.com/item/1-Gang-US-EU-UK-Plug-Wall-Wifi-Light-Switch-Smart-Touch-LED-Lights-Switch-for/32934184095.html) | yes |  |  | yes |  |  | manfufacturer: KingART, model: KING-N1 (according to ewelink app), Chip: PSF-B85 (ESP8285) |
 | WHDTS WiFi Momentary Inching Relay | yes |  |  |  |  |  | displayed as a switch button |
@@ -96,4 +97,3 @@ Feel free to properly ask support for new devices [using these guidelines](https
 - [@2016for](https://github.com/2016for) for assisting me with properly integrating the switches with multiple outlets
 - [@fireinice](https://github.com/fireinice) for providing the mandarin implementation
 - [@SergeyAnokhin](https://github.com/SergeyAnokhin) for adding power metter info to entity attributes
-
