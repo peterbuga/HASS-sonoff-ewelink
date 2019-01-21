@@ -14,7 +14,7 @@ else:
 	args=parser.parse_args()
 
 	# positional params
-	if hasattr(args, 'email') and hasattr(args, 'password'):
+	if hasattr(args, 'username') and hasattr(args, 'password'):
 		username	= args.username
 		password 	= args.password
 
@@ -55,7 +55,7 @@ def do_login():
 	try:
 		#python3.6+
 		decryptedAppSecret = b'6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
-		hex_dig = hmac.new(decryptedAppSecret, json.dumps(app_details), digestmod=hashlib.sha256).digest()
+		hex_dig = hmac.new(decryptedAppSecret, str.encode(json.dumps(app_details)), digestmod=hashlib.sha256).digest()
 	except:
 		#python2.7
 		decryptedAppSecret = '6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
