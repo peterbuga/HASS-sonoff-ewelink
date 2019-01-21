@@ -34,7 +34,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             entity = SonoffSwitch(hass, device)
             entities.append(entity)
 
-    async_add_entities(entities, update_before_add=False)
+    if len(entities):
+        async_add_entities(entities, update_before_add=False)
 
 class SonoffSwitch(SonoffDevice, SwitchDevice):
     """Representation of a Sonoff switch device."""
@@ -46,6 +47,23 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
         SonoffDevice.__init__(self, hass, device)
         self._outlet = outlet
         self._name   = '{}{}'.format(device['name'], '' if outlet is None else ' '+str(outlet+1))
+
+        if outlet is None:
+            self._name      = device['name']
+
+        else:
+            self._attributes['outlet'] = outlet
+
+            if 'tags' in device and 'ck_channel_name' in device['tags']:
+                if str(outlet) in device['tags']['ck_channel_name'].keys() and \
+                    device['tags']['ck_channel_name'][str(outlet)]:
+                    self._name = '{} - {}'.format(device['name'], device['tags']['ck_channel_name'][str(outlet)])
+
+                    self._attributes['outlet_name'] = device['tags']['ck_channel_name'][str(outlet)]
+                else:
+                    self._name = '{} {}'.format(device['name'], ('CH %s' % str(outlet+1)) )
+            else:
+                self._name = '{} {}'.format(device['name'], ('CH %s' % str(outlet+1)) )
 
     @property
     def is_on(self):
@@ -78,6 +96,6 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
         entity_id = "{}.{}".format(DOMAIN, self._deviceid)
 
         if self._outlet is not None:
-            entity_id = "{}_{}".format(entity_id, str(self._outlet+1) )
+            entity_id = "{}_{}".format(entity_id, str(self._outlet+1))
         
         return entity_id

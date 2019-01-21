@@ -504,25 +504,7 @@ class SonoffDevice(Entity):
 
         self._attributes    = {
             'device_id'     : self._deviceid,
-        }
-
-        if outlet is None:
-            self._name      = device['name']
-        else:
-            self._attributes['outlet'] = outlet
-
-            if 'tags' in device and 'ck_channel_name' in device['tags']:
-                if str(outlet) in device['tags']['ck_channel_name'].keys() and \
-                    device['tags']['ck_channel_name'][str(outlet)]:
-                    self._name          = '{} - {}'.format(
-                                            device['name'], 
-                                            device['tags']['ck_channel_name'][str(outlet)])
-
-                    self._attributes['outlet_name'] = device['tags']['ck_channel_name'][str(outlet)]
-                else:
-                    self._name          = '{} {}'.format(device['name'], ('CH %s' % str(outlet+1)) )
-            else:
-                self._name          = '{} {}'.format(device['name'], ('CH %s' % str(outlet+1)) )       
+        }       
 
     def get_device(self):
         for device in self._hass.data[DOMAIN].get_devices():
