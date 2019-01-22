@@ -1,8 +1,10 @@
 # The domain of your component. Should be equal to the name of your component.
-import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading
+import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading, hashlib
 import voluptuous as vol
 
 from datetime import timedelta
+from datetime import datetime
+
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util.async_ import run_coroutine_threadsafe
@@ -17,9 +19,10 @@ from homeassistant.const import (
 
 CONF_API_REGION     = 'api_region'
 CONF_GRACE_PERIOD   = 'grace_period'
+CONF_DEBUG          = 'debug'
 
-SCAN_INTERVAL = timedelta(seconds=60)
-DOMAIN = "sonoff"
+SCAN_INTERVAL       = timedelta(seconds=60)
+DOMAIN              = "sonoff"
 
 REQUIREMENTS = ['uuid', 'websocket-client']
 
@@ -33,9 +36,12 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Exclusive(CONF_EMAIL, CONF_PASSWORD): cv.string,
 
         vol.Required(CONF_PASSWORD): cv.string,
+
         vol.Optional(CONF_API_REGION, default='eu'): cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
-        vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int
+        vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
+        
+        vol.Optional(CONF_DEBUG, default=False): cv.boolean
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
 
@@ -73,6 +79,8 @@ class Sonoff():
         self._password      = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
         self._api_region    = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
         self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
+        
+        self._debug         = config.get(DOMAIN, {}).get(CONF_DEBUG, False)
 
         if self._email and not self._username: # backwards compatibility
             self._username = self._email.strip()
@@ -85,6 +93,7 @@ class Sonoff():
         self._ws            = None
         self._wshost        = None
 
+        self.write_debug('{}', new=True)
         self.do_login()
             
     def do_login(self):
@@ -248,6 +257,9 @@ class Sonoff():
                 else:
                     self._devices[idxd]['params']['switch'] = new_state
 
+        data = json.dumps({'entity_id' : str(device['deviceid']), 'outlet': outlet, 'new_state' : new_state})
+        self.write_debug(data, type='S')
+
     def init_websocket(self):
         # keep websocket open indefinitely
         while True:
@@ -280,6 +292,8 @@ class Sonoff():
 
                         break # do not remove
 
+        self.write_debug(json.dumps(data), type='W')
+
     def on_error(self, *args):
         error = args[-1] # to accomodate the case when the function receives 2 or 3 args
         _LOGGER.error('websocket error: %s' % str(error))
@@ -297,6 +311,9 @@ class Sonoff():
         entity_id = 'switch.%s%s' % (deviceid, '_'+str(outlet+1) if outlet is not None else '')
         attr = self._hass.states.get(entity_id).attributes
         self._hass.states.set(entity_id, state, attr)
+
+        data = json.dumps({'entity_id' : entity_id, 'outlet': outlet, 'state' : state})
+        self.write_debug(data, type='s')
 
     def update_devices(self):
         # we are in the grace period, no updates to the devices
@@ -321,6 +338,9 @@ class Sonoff():
             self.do_login()
 
         self._devices = r.json()
+
+        self.write_debug(r.text, type='D')
+
         return self._devices
 
     def get_devices(self, force_update = False):
@@ -441,7 +461,50 @@ class Sonoff():
             return name_to_outlets[uiid_to_name[device['uiid']]]
 
         return None
-  
+    
+    ### sonog_debug.log section ###
+    def write_debug(self, data, type = '', new = False):
+        if self._debug:
+            debug_file    = self._hass.config.path('sonoff_debug.log')
+
+            with open(debug_file, 'wb' if new else 'ab') as sonoff_debug:
+                if new:
+                    _LOGGER.debug("init sonoff debug file write")
+                else:
+                    data = json.loads(data)
+                    
+                    # remove extra info
+                    if isinstance(data, list):
+                        for idx, d in enumerate(data):
+                            for k in ['extra', 'sharedTo','settings','group','groups','deviceUrl','deviceStatus','location','showBrand']:
+                                if k in d.keys(): del d[k]
+
+                            # hide deviceid
+                            if 'deviceid' in d.keys():
+                                m = hashlib.md5()
+                                m.update(d['deviceid'].encode('utf-8'))
+                                d['deviceid'] = m.hexdigest()
+
+                            data[idx] = d
+
+                    data = json.dumps(data, indent=2, sort_keys=True)
+                    data = self.clean_data(data)
+                    data = json.dumps(json.loads(data))
+
+                    data = "%s [%s] %s\n\n" % (datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3], type, data)
+                    sonoff_debug.write(data.encode('utf-8'))
+
+    def clean_data(self, data):
+        data = re.sub(r'"phoneNumber": ".*"', '"phoneNumber": "[hidden]",', data)
+        # data = re.sub(r'"name": ".*"', '"name": "[hidden]",', data)
+        data = re.sub(r'"ip": ".*",', '"ip": "[hidden]",', data)
+        #data = re.sub(r'"deviceid": ".*",', '"deviceid": "[hidden]",', data)
+        # data = re.sub(r'"_id": ".*",', '"_id": "[hidden]",', data)
+        data = re.sub(r'"\w{2}:\w{2}:\w{2}:\w{2}:\w{2}:\w{2}"', '"xx:xx:xx:xx:xx:xx"', data)
+        data = re.sub(r'"\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"', '"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"', data)
+        # data = re.sub(r'"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z"', '"xxxx-xx-xxxxx:xx:xx.xxx"', data)
+        return data
+
 class WebsocketListener(threading.Thread, websocket.WebSocketApp):
     def __init__(self, sonoff, on_message=None, on_error=None):
         self._sonoff        = sonoff
