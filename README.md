@@ -32,9 +32,9 @@ And copy the *.py files in `custom_components` folder using the same structure l
 ```
  custom_components
     └── sonoff
-        └── __init__.py (this is the main sonoff.py just renamed as __init__.py)
-        └── sensor.py
-        └── switch.py
+        └── __init__.py (this is the /custom_components/sonoff.py just renamed as __init__.py)
+        └── sensor.py (this is the /custom_components/sensor/sonoff.py just renamed as sensor.py)
+        └── switch.py (this is the /custom_components/switch/sonoff.py just renamed as switch.py)
 ```
 
 `email` [Deprecated] used only for compatibility, may be eliminated in future.
