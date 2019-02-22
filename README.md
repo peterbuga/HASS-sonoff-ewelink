@@ -28,6 +28,15 @@ And copy the *.py files in `custom_components` folder using the same structure l
         └── sonoff.py
 ```
 
+`Disclaimer:` If and only if on HA 0.88+, Folder structure should look like:
+```
+ custom_components
+    └── sonoff
+        └── __init__.py (this is the main sonoff.py just renamed as __init__.py)
+        └── sensor.py
+        └── switch.py
+```
+
 `email` [Deprecated] used only for compatibility, may be eliminated in future.
 
 `username` the username that you registered for ewelink account be it an email or a phone number (the phone number should lead with region number, '+8612345678901' for example).
