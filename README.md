@@ -21,11 +21,10 @@ sonoff:
 And copy the *.py files in `custom_components` folder using the same structure like defined here:
 ```
  custom_components
-    ├── sonoff.py
-    └── switch
-        └── sonoff.py
-    └── sensor
-        └── sonoff.py
+    └── sonoff
+        └── __init__.py
+        └── switch.py
+        └── sensor.py
 ```
 
 `email` [Deprecated] used only for compatibility, may be eliminated in future.
