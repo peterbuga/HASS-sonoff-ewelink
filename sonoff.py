@@ -286,7 +286,7 @@ class Sonoff():
 
                         if 'switches' in data['params']:
                             for switch in data['params']['switches']:
-                                self.set_entity_state(data['deviceid'], data['params']['switch'], switch['outlet'])    
+                                self.set_entity_state(data['deviceid'], switch['switch'], switch['outlet'])    
                         else:
                             self.set_entity_state(data['deviceid'], data['params']['switch'])
 
