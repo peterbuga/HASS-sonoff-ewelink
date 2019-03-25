@@ -44,7 +44,7 @@ This is just a proof of concept because I searched for it and there was no imple
 ## Compatibility list
 | Model | Supported | 1.6 | 1.8.1 | 2.6 | 2.6.1 | 2.7.1 | 3.0.0 | Remarks |
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:---:|:-----:|:---:|-------|:-----:|:---:|--------------------------------------------------------------------------------------------|
-| Sonoff Basic | yes | yes | yes | yes |  |  |  |   |
+| Sonoff Basic | yes | yes | yes | yes |  |  | yes |   |
 | Sonoff Dual | yes |  |  |  |  |  |  |  |
 | Sonoff RF | yes |  |  |  | yes |  | yes |  |
 | Sonoff G1 | ? |  |  |  |  |  |  |  |
