@@ -20,7 +20,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                     entity = SonoffSwitch(hass, device, outlet['outlet'])
                     entities.append(entity)
 
-            elif 'switch' in device['params'] or 'state' in device['params']:
+            elif 'switch' in device['params']: # or 'state' in device['params']:
                 entity = SonoffSwitch(hass, device)
                 entities.append(entity)
 
@@ -30,7 +30,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 entities.append(entity)
 	
         # normal device = Sonoff Basic (and alike)
-        elif 'switch' in device['params'] or 'state' in device['params']: #ignore devices like Sonoff RF bridge: 
+        elif 'switch' in device['params']: # or 'state' in device['params']: #ignore devices like Sonoff RF bridge: 
             entity = SonoffSwitch(hass, device)
             entities.append(entity)
 
@@ -77,19 +77,26 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
 
     def turn_on(self, **kwargs):
         """Turn the device on."""
+        params = {'switch' : 'on'}
+        if self._outlet is not None:
+            params.update({'outlet' : self._outlet})
+
         self._hass.bus.async_fire('sonoff_state', {
-            'state'     : True,
             'deviceid'  : self._deviceid,
-            'outlet'    : self._outlet
+            'params'    : params
         })
         self.async_schedule_update_ha_state()
 
     def turn_off(self, **kwargs):
         """Turn the device off."""
+
+        params = {'switch' : 'off'}
+        if self._outlet is not None:
+            params.update({'outlet' : self._outlet})
+
         self._hass.bus.async_fire('sonoff_state', {
-            'state'     : False,
             'deviceid'  : self._deviceid,
-            'outlet'    : self._outlet
+            'params'    : params
         })
         self.async_schedule_update_ha_state()
 

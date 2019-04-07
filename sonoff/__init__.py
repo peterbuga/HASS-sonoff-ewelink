@@ -62,7 +62,7 @@ async def async_setup(hass, config):
 
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
 
-        for component in ['switch','sensor']:
+        for component in ['switch','sensor', 'light']:
             discovery.load_platform(hass, component, DOMAIN, {}, config)
 
         hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
@@ -215,22 +215,32 @@ class Sonoff():
             _LOGGER.error('websocket is not connected') 
             return           
 
-        _LOGGER.debug('received state event change from: %s' % event.data['deviceid'])
+        # _LOGGER.debug('Received state event change for: %s' % event.data['deviceid'])
 
-        new_state = event.data['state']
+        params = event.data.get('params', None)
 
-        # convert from True/False to on/off
-        if isinstance(new_state, (bool)):
-            new_state = 'on' if new_state else 'off'
+        if params is None:
+            _LOGGER.error('improper event state sent') 
+            return
+
+        # # convert from True/False to on/off
+        # if isinstance(new_state, (bool)):
+        #     new_state = 'on' if new_state else 'off'
 
         device = self.get_device(event.data['deviceid'])
-        outlet = event.data['outlet']
+        # outlet = event.data.get('outlet', None)
 
-        if outlet is not None:
+        if 'outlet' in params: # it's a multi switch capable device
+
             _LOGGER.debug("Switching `%s - %s` on outlet %d to state: %s", \
-                device['deviceid'], device['name'] , (outlet+1) , new_state)
+                device['deviceid'], device['name'] , (int(params['outlet']) + 1), params['switch'])
+
+            p = { 'switches' : device['params']['switches'] }
+            p['switches'][params['outlet']]['switch'] = params['switch']
+            params = p
+
         else:
-            _LOGGER.debug("Switching `%s` to state: %s", device['deviceid'], new_state)
+            _LOGGER.debug("Device `%s` change to: %s", device['deviceid'], json.dumps(params))
 
         if not device:
             _LOGGER.error('unknown device to be updated')
@@ -245,12 +255,6 @@ class Sonoff():
               apikey      = device apikey
               selfApiKey  = login apikey (yes, it's typed corectly selfApikey and not selfApiKey :|)
         """
-        if outlet is not None:
-            params = { 'switches' : device['params']['switches'] }
-            params['switches'][outlet]['switch'] = new_state
-
-        else:
-            params = { 'switch' : new_state }
 
         payload = {
             'action'        : 'update',
@@ -272,12 +276,16 @@ class Sonoff():
         # set also te pseudo-internal state of the device until the real refresh kicks in
         for idxd, dev in enumerate(self._devices):
             if dev['deviceid'] == device['deviceid']:
-                if outlet is not None:
-                    self._devices[idxd]['params']['switches'][outlet]['switch'] = new_state
+                if 'outlet' in params:
+                    self._devices[idxd]['params']['switches'][params['outlet']]['switch'] = params['switch']
                 else:
-                    self._devices[idxd]['params']['switch'] = new_state
+                    self._devices[idxd]['params'].update(params)
 
-        data = json.dumps({'entity_id' : str(device['deviceid']), 'outlet': outlet, 'new_state' : new_state})
+        data = json.dumps({
+            'entity_id' : str(device['deviceid']), 
+            'outlet': params['outlet'] if 'outlet' in params else None, 
+            'params' : params
+        })
         self.write_debug(data, type='S')
 
     def init_websocket(self):
@@ -360,6 +368,71 @@ class Sonoff():
         self._devices = r.json()
 
         self.write_debug(r.text, type='D')
+
+        b1 = json.loads("""{
+    "__v": 0, 
+    "_id": "[hidden]",
+    "apikey": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", 
+    "brandName": "Sonoff", 
+    "createdAt": "xxxx-xx-xxxxx:xx:xx.xxx", 
+    "deviceStatus": "", 
+    "deviceUrl": "", 
+    "deviceid": "100099999" ,
+    "devicekey": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", 
+    "extra": {
+      "_id": "[hidden]" ,
+      "extra": {
+        "apmac": "xx:xx:xx:xx:xx:xx", 
+        "brandId": "58e5f344baeb368720e25469", 
+        "description": "WWJG001266", 
+        "mac": "xx:xx:xx:xx:xx:xx", 
+        "manufacturer": "\u6df1\u5733\u677e\u8bfa\u6280\u672f\u6709\u9650\u516c\u53f8", 
+        "model": "PSF-BLB-GL", 
+        "modelInfo": "5a2e1aff0cf772f92c342efc", 
+        "ui": "RGB\u4e94\u8272\u7403\u6ce1\u706f", 
+        "uiid": 22
+      }
+    }, 
+    "group": "", 
+    "groups": [], 
+    "ip": "0.0.0.0" ,
+    "location": "", 
+    "name": "sonoff b1", 
+    "offlineTime": "xxxx-xx-xxxxx:xx:xx.xxx", 
+    "online": true, 
+    "onlineTime": "xxxx-xx-xxxxx:xx:xx.xxx", 
+    "params": {
+      "channel0": "255", 
+      "channel1": "0", 
+      "channel2": "0", 
+      "channel3": "0", 
+      "channel4": "0", 
+      "fwVersion": "2.6.0", 
+      "partnerApikey": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", 
+      "rssi": -59, 
+      "sledOnline": "off", 
+      "staMac": "xx:xx:xx:xx:xx:xx", 
+      "state": "on", 
+      "timers": [
+      ], 
+      "type": "cold", 
+      "zyx_mode": 1
+    }, 
+    "productModel": "B1_R2", 
+    "settings": {
+      "alarmNotify": 1, 
+      "opsHistory": 1, 
+      "opsNotify": 0
+    }, 
+    "sharedTo": [], 
+    "showBrand": true, 
+    "tags": {
+      "disable_timers": []
+    }, 
+    "type": "10", 
+    "uiid": 22
+  }""")
+        self._devices.append(b1)
 
         return self._devices
 
@@ -638,7 +711,11 @@ class SonoffDevice(Entity):
             return device['params']['switches'][self._outlet]['switch'] == 'on' if device else False
 
         else:
-            return device['params']['switch'] == 'on' if device else False
+            # `state` for B1
+            # `switch` for everything else
+
+            state_key = 'state' if 'state' in device['params'] and not 'switch' in device['params'] else 'switch'
+            return device['params'][state_key] == 'on' if device else False
 
     def get_available(self):
         device = self.get_device()
@@ -667,6 +744,18 @@ class SonoffDevice(Entity):
         # we don't update here because there's 1 single thread that can be active at anytime
         # and the websocket will send the state update messages
         pass
+
+    @property
+    def device_info(self):
+        """Return the device info."""
+
+        device = self.get_device()
+
+        return {
+            'model' : device['productModel'],
+            # 'ip'    : device['ip'],
+            'mac'   : device['params']['staMac']
+        }
 
 
     @property
