@@ -34,6 +34,10 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             entity = SonoffSwitch(hass, device)
             entities.append(entity)
 
+    if hass.data[SONOFF_DOMAIN].get_debug_state():
+        debug_entity = SonoffDebugSwitch(hass)
+        entities.append(debug_entity)        
+
     if len(entities):
         async_add_entities(entities, update_before_add=False)
 
@@ -93,9 +97,49 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
     @property
     def entity_id(self):
         """Return the unique id of the switch."""
-        entity_id = "{}.{}".format(DOMAIN, self._deviceid)
+
+        if self._hass.data[SONOFF_DOMAIN].get_entity_prefix():
+            entity_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid)
+        else:
+            entity_id = "{}.{}".format(DOMAIN, self._deviceid)
 
         if self._outlet is not None:
             entity_id = "{}_{}".format(entity_id, str(self._outlet+1))
         
         return entity_id
+
+class SonoffDebugSwitch(SwitchDevice):
+    def __init__(self, hass):
+        self._hass = hass
+
+    @property
+    def should_poll(self):
+        return False
+
+    @property
+    def name(self):
+        return "sonoff debug"
+
+    @property
+    def available(self):
+        return True
+
+    def update(self):
+        pass
+
+    @property
+    def entity_id(self):
+        entity_id = "{}.{}".format(DOMAIN, 'sonoff_debug')
+        return entity_id
+
+    @property
+    def is_on(self):
+        return self._hass.states.get('switch.sonoff_debug') and \
+                self._hass.states.is_state('switch.sonoff_debug','on')
+
+    def turn_on(self, **kwargs):
+        self._hass.states.set('switch.sonoff_debug', 'on')
+
+    def turn_off(self, **kwargs):
+        self._hass.states.set('switch.sonoff_debug', 'off') # , attr
+        self._hass.data[SONOFF_DOMAIN].write_debug('{}') # send dummy data to trigger the notification

@@ -15,16 +15,15 @@ from homeassistant.const import (
     CONF_EMAIL, CONF_PASSWORD, CONF_USERNAME,
     HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, 
     HTTP_UNAUTHORIZED, HTTP_NOT_FOUND)
-# from homeassistant.util import Throttle
 
 CONF_API_REGION     = 'api_region'
 CONF_GRACE_PERIOD   = 'grace_period'
 CONF_DEBUG          = 'debug'
+CONF_ENTITY_PREFIX  = 'entity_prefix'
 
-SCAN_INTERVAL       = timedelta(seconds=60)
 DOMAIN              = "sonoff"
 
-REQUIREMENTS = ['uuid', 'websocket-client']
+REQUIREMENTS = ['uuid', 'websocket-client==0.54.0']
 
 import websocket
 
@@ -38,8 +37,9 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Required(CONF_PASSWORD): cv.string,
 
         vol.Optional(CONF_API_REGION, default='eu'): cv.string,
-        vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.time_period,
+        vol.Optional(CONF_SCAN_INTERVAL, default=timedelta(seconds=30)): cv.time_period,
         vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
+        vol.Optional(CONF_ENTITY_PREFIX, default=True): cv.boolean,
         
         vol.Optional(CONF_DEBUG, default=False): cv.boolean
     }, extra=vol.ALLOW_EXTRA),
@@ -48,15 +48,23 @@ CONFIG_SCHEMA = vol.Schema({
 async def async_setup(hass, config):
     """Setup the eWelink/Sonoff component."""
 
-    SCAN_INTERVAL   = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL,'')
-
     _LOGGER.debug("Create the main object")
 
     hass.data[DOMAIN] = Sonoff(hass, config)
+
+    if hass.data[DOMAIN].get_debug_state():
+        SCAN_INTERVAL = timedelta(seconds=10)
+    else:
+        if config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL) > timedelta(seconds=60):
+            SCAN_INTERVAL = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL)
+        else:
+            SCAN_INTERVAL = timedelta(seconds=60)
+
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
 
         for component in ['switch','sensor']:
             discovery.load_platform(hass, component, DOMAIN, {}, config)
+
         hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
 	
         # close the websocket when HA stops
@@ -71,6 +79,7 @@ async def async_setup(hass, config):
 
 class Sonoff():
     def __init__(self, hass, config):
+
         self._hass          = hass
 
         # get config details from from configuration.yaml
@@ -78,9 +87,11 @@ class Sonoff():
         self._username      = config.get(DOMAIN, {}).get(CONF_USERNAME,'')
         self._password      = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
         self._api_region    = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
+        self._entity_prefix = config.get(DOMAIN, {}).get(CONF_ENTITY_PREFIX,'')
         self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
         
-        self._debug         = config.get(DOMAIN, {}).get(CONF_DEBUG, False)
+        self._sonoff_debug  = config.get(DOMAIN, {}).get(CONF_DEBUG, False)
+        self._sonoff_debug_log = []
 
         if self._email and not self._username: # backwards compatibility
             self._username = self._email.strip()
@@ -95,8 +106,17 @@ class Sonoff():
 
         self.write_debug('{}', new=True)
         self.do_login()
+
+    def get_debug_state(self):
+        return self._sonoff_debug
+
+    def get_entity_prefix(self):
+        # if the entities should have `sonoff_` prefixed or not
+        # a quick fix between (i-blame-myself) `master` vs. `websocket` implementations
+        return self._entity_prefix
             
     def do_login(self):
+
         import uuid
 
         # reset the grace period
@@ -464,35 +484,50 @@ class Sonoff():
     
     ### sonog_debug.log section ###
     def write_debug(self, data, type = '', new = False):
-        if self._debug:
-            debug_file    = self._hass.config.path('sonoff_debug.log')
 
-            with open(debug_file, 'wb' if new else 'ab') as sonoff_debug:
-                if new:
-                    _LOGGER.debug("init sonoff debug file write")
-                else:
-                    data = json.loads(data)
+        if self._sonoff_debug and self._hass.states.get('switch.sonoff_debug') and self._hass.states.is_state('switch.sonoff_debug','on'):
+
+            if not len(self._sonoff_debug_log):
+                _LOGGER.debug("init sonoff debug data capture")
+                self._sonoff_debug_log.append(".\n--------------COPY-FROM-HERE--------------\n\n")
+
+            data = json.loads(data)
+            
+            # remove extra info
+            if isinstance(data, list):
+                for idx, d in enumerate(data):
+                    for k in ['extra', 'sharedTo','settings','group','groups','deviceUrl','deviceStatus',
+                                'location','showBrand','brandLogoUrl','__v','_id','ip',
+                                'deviceid','createdAt','devicekey','apikey','partnerApikey','tags']:
+                        if k in d.keys(): del d[k]
                     
-                    # remove extra info
-                    if isinstance(data, list):
-                        for idx, d in enumerate(data):
-                            for k in ['extra', 'sharedTo','settings','group','groups','deviceUrl','deviceStatus','location','showBrand']:
-                                if k in d.keys(): del d[k]
+                    for k in ['staMac','bindInfos','rssi','timers','partnerApikey']:
+                        if k in d['params'].keys(): del d['params'][k]
 
-                            # hide deviceid
-                            if 'deviceid' in d.keys():
-                                m = hashlib.md5()
-                                m.update(d['deviceid'].encode('utf-8'))
-                                d['deviceid'] = m.hexdigest()
+                    # hide deviceid
+                    if 'deviceid' in d.keys():
+                        m = hashlib.md5()
+                        m.update(d['deviceid'].encode('utf-8'))
+                        d['deviceid'] = m.hexdigest()
 
-                            data[idx] = d
+                    data[idx] = d
 
-                    data = json.dumps(data, indent=2, sort_keys=True)
-                    data = self.clean_data(data)
-                    data = json.dumps(json.loads(data))
+            data = json.dumps(data, indent=2, sort_keys=True)
+            data = self.clean_data(data)
+            data = json.dumps(json.loads(data))
 
-                    data = "%s [%s] %s\n\n" % (datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3], type, data)
-                    sonoff_debug.write(data.encode('utf-8'))
+            data = "%s [%s] %s\n\n" % (datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3], type, data)
+            self._sonoff_debug_log.append(data)
+
+        elif self._sonoff_debug and len(self._sonoff_debug_log) and \
+            self._hass.states.get('switch.sonoff_debug') and \
+            self._hass.states.is_state('switch.sonoff_debug','off'):
+
+            _LOGGER.debug("end of sonoff debug log")
+            self._sonoff_debug_log.append("---------------END-OF-COPY----------------\n")
+            self._sonoff_debug_log = [x.encode('utf-8') for x in self._sonoff_debug_log]
+            self._hass.components.persistent_notification.async_create(str(b"".join(self._sonoff_debug_log), 'utf-8'), 'Sonoff debug')
+            self._sonoff_debug_log = []
 
     def clean_data(self, data):
         data = re.sub(r'"phoneNumber": ".*"', '"phoneNumber": "[hidden]",', data)
