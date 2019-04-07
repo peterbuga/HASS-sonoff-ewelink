@@ -51,6 +51,7 @@ This is just a proof of concept because I searched for it and there was no imple
 
 
 ## Compatibility list
+
 | Model | Supported | 1.6 | 1.8.1 | 2.6 | 2.6.1 | 2.7.1 | 3.0.0 | Remarks |
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:---:|:-----:|:---:|-------|:-----:|:---:|--------------------------------------------------------------------------------------------|
 | Sonoff Basic | yes | yes | yes | yes |  |  | yes |   |
@@ -59,7 +60,7 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff G1 | ? |  |  |  |  |  |  |  |
 | Sonoff 4CH Pro | yes |  |  | yes |  | yes |  |  |
 | Sonoff 4CH Pro R2 | yes |  |  | yes |  |  |  |  |
-| Sonoff S20 | yes |  | yes |  |  |  |  |  |
+| Sonoff S20 | yes |  | yes |  |  |  | yes |  |
 | Sonoff S31 | yes |  |  |  |  |  |  | only switch operation |
 | [Sonoff S26](https://www.aliexpress.com/item/Sonoff-S26-WiFi-Smart-Socket-Wireless-Plug-Power-Socket-Smart-Home-Switch-Smart-Remote-Control-for/32956551752.html) | yes |  |  | yes |  |  | yes | version: Euro |
 | Sonoff T1 1C | yes |  |  | yes |  |  |  |  |
