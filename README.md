@@ -5,7 +5,8 @@ Simple Home Assistant component to add/control Sonoff/eWeLink smart devices usin
 ### WARNING: completely deactivate the `sonoff` component from HA while doing a firmware update, due to auto-relogin function you might be kicked out of the app before the process is completed. I would not be held liable for any problems occuring if not following this steps!
 ***
 
-**CHECK COMPATIBILITY LIST BELOW! IF IT DOESN'T WORK FOR YOUR DEVICE DON'T COMPLAIN AND OPEN A PROPER ISSUE**
+**CHECK COMPATIBILITY LIST BELOW (not everyday updated)! 
+TRY THE COMPONENT FIRST AND IF IT DOESN'T WORK FOR YOUR DEVICE DON'T COMPLAIN AND OPEN A PROPER ISSUE**
 
 ## Setup
 
@@ -14,9 +15,11 @@ To setup add to your configuration.yaml:
 sonoff:
   username: [email or phone number]
   password: [password]
-  scan_interval: 60 (optional)
+  scan_interval: 60 (optional, lower values than 60 won't work anymore!)
   grace_period: 600 (optional)
   api_region: 'eu' (optional)
+  entity_prefix: True (optional)
+  debug: False (optional)
 ```
 And copy the *.py files in `custom_components` folder using the same structure like defined here:
 ```
@@ -37,6 +40,12 @@ And copy the *.py files in `custom_components` folder using the same structure l
 
 `api_region` this component tries to find, login & connect to the proper region assigned to you. specifying a proper region will help the component to load faster and reconnect after the expired grace period explained above, possible values: `eu` (default), `us` or `cn`
 
+`entity_prefix` this option removes the `sonoff_` prefix from entities name (it's more or a less a compatibility mode between previous `master` vs `websocket` branch implementations)
+
+`debug` if enabled this will give you the ability to generate a log of messages from ewelink that can be easily posted here to debug/implement new devices. it works by creating a pseudo switch `switch.sonoff_debug` (notice it won't show up automatically in frontend in lovelace you have to **manually add it** or toggle it manually from `Developer tools > Services` section). 
+to generate a sonoff debug log toggle the pseudo-switch ON, the capture of messages starts in the background. now **pick up the phone -> open eWeLink app** and start changing settings of your Sonoff device but not faster than 5 seconds, when you finish, toggle the pseudo-switch OFF and a new (very long) persistent notification will show up, go to `Developer tools > States` section and look for a `persistent_notification.notification` entity (impossible to miss) and copy the message from there (to remove this notifications and others Dismiss them from main HA notifications area and you can restart the process if needed). 
+NOTICE: you should **NOT** leave debug-mode enabled for everyday use, please just please don't!
+ 
 This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (althought I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
 
 
@@ -95,4 +104,5 @@ Feel free to properly ask support for new devices [using these guidelines](https
 - [@2016for](https://github.com/2016for) for assisting me with properly integrating the switches with multiple outlets
 - [@fireinice](https://github.com/fireinice) for providing the mandarin implementation
 - [@SergeyAnokhin](https://github.com/SergeyAnokhin) for adding power metter info to entity attributes
+- [@Michaelrch](https://community.home-assistant.io/u/michaelrch) for awesome support!
 
