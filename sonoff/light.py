@@ -46,12 +46,12 @@ class SonoffLight(SonoffDevice, LightDevice):
         # calculate the mode 
         self._mode          = EFFECT_WARMCOOL
 
-        # calculate
+        # @TODO calculate below values
         self._hs_color      = None
-        
         self._color_temp    = None
-        self._ch0           = 0
-        self._ch1           = 0
+
+        self._ch01          = [255, 255]
+        self._ch234         = [100, 100, 100]
 
         self._brightness    = 255
 
@@ -104,9 +104,8 @@ class SonoffLight(SonoffDevice, LightDevice):
             self._mode = kwargs['effect']
 
             if self._mode == EFFECT_WARMCOOL:
-
-                ch0 = int(self._ch0 * self._brightness / 255)
-                ch1 = int(self._ch1 * self._brightness / 255)
+                ch0 = int(self._ch01[0] * self._brightness / 255)
+                ch1 = int(self._ch01[1] * self._brightness / 255)
 
                 params = {
                     "channel0": str(ch0), # cool
@@ -115,13 +114,17 @@ class SonoffLight(SonoffDevice, LightDevice):
                     "channel3": "0", # green
                     "channel4": "0" # blue
                 }
-            else:
+
+            else: # RGB mode
+                rgb = color.color_hs_to_RGB(*self._hs_color)
+                rgb = [int(x * self._brightness / 255) for x in rgb]
+
                 params = {
                     "channel0": "0", # cool
                     "channel1": "0", # white
-                    "channel2": "200", # red
-                    "channel3": "0", # green
-                    "channel4": "200" # blue
+                    "channel2": str(rgb[0]), # red
+                    "channel3": str(rgb[1]), # green
+                    "channel4": str(rgb[2]) # blue
                 }
 
         elif 'color_temp' in kwargs:
@@ -146,8 +149,7 @@ class SonoffLight(SonoffDevice, LightDevice):
                     ch1 = int( (color_temp * 255) / 173)
 
             # apply brightness to values
-            self._ch0 = ch0
-            self._ch1 = ch1 
+            self._ch01 = [ch0, ch1]
 
             ch0 = int(ch0 * self._brightness / 255)
             ch1 = int(ch1 * self._brightness / 255)
@@ -161,8 +163,11 @@ class SonoffLight(SonoffDevice, LightDevice):
             }
 
         elif 'hs_color' in kwargs:
-            rgb = color.color_hs_to_RGB(*kwargs['hs_color'])
             self._hs_color = kwargs['hs_color']
+            rgb = color.color_hs_to_RGB(*kwargs['hs_color'])
+            
+            # apply brightness
+            rgb = [int(x * self._brightness / 255) for x in rgb]
 
             params = {
                 "channel0": "0", # cool
@@ -177,8 +182,8 @@ class SonoffLight(SonoffDevice, LightDevice):
 
             if self._mode == EFFECT_WARMCOOL:
 
-                ch0 = int(self._ch0 * self._brightness / 255)
-                ch1 = int(self._ch1 * self._brightness / 255)
+                ch0 = int(self._ch01[0] * self._brightness / 255)
+                ch1 = int(self._ch01[1] * self._brightness / 255)
 
                 params = {
                     "channel0": str(ch0), # cool
@@ -187,8 +192,17 @@ class SonoffLight(SonoffDevice, LightDevice):
                     "channel3": "0", # green
                     "channel4": "0" # blue
                 }
-            else:
-                params = {}
+            else: # rgb mode
+                rgb = color.color_hs_to_RGB(*self._hs_color)
+                rgb = [int(x * self._brightness / 255) for x in rgb]
+
+                params = {
+                    "channel0": "0", # cool
+                    "channel1": "0", # white
+                    "channel2": str(rgb[0]), # red
+                    "channel3": str(rgb[1]), # green
+                    "channel4": str(rgb[2]) # blue
+                }
 
         _LOGGER.debug('Light params: %s', json.dumps(params) )
 
@@ -237,6 +251,6 @@ class SonoffLight(SonoffDevice, LightDevice):
         """Flag supported features."""
 
         if self._mode == EFFECT_WARMCOOL:
-            return (SUPPORT_BRIGHTNESS | SUPPORT_COLOR_TEMP | SUPPORT_EFFECT)
+            return (SUPPORT_EFFECT | SUPPORT_BRIGHTNESS | SUPPORT_COLOR_TEMP)
         else:
-            return (SUPPORT_COLOR | SUPPORT_EFFECT)
+            return (SUPPORT_EFFECT | SUPPORT_BRIGHTNESS | SUPPORT_COLOR)
