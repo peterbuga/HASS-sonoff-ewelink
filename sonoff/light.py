@@ -70,8 +70,7 @@ class SonoffLight(SonoffDevice, LightDevice):
     @property
     def brightness(self):
         """Return the brightness of this light between 0..255."""
-
-        return self._brightness if self._state and self._mode == EFFECT_WARMCOOL else 0
+        return self._brightness
 
     @property
     def hs_color(self):
