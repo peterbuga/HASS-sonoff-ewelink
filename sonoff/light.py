@@ -47,8 +47,8 @@ class SonoffLight(SonoffDevice, LightDevice):
         self._mode          = EFFECT_WARMCOOL
 
         # @TODO calculate below values
-        self._hs_color      = None
-        self._color_temp    = None
+        self._hs_color      = [0, 0]
+        self._color_temp    = 350
 
         self._ch01          = [255, 255]
         self._ch234         = [100, 100, 100]

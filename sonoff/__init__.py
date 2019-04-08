@@ -54,6 +54,7 @@ async def async_setup(hass, config):
 
     if hass.data[DOMAIN].get_debug_state():
         SCAN_INTERVAL = timedelta(seconds=10)
+
     else:
         if config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL) > timedelta(seconds=60):
             SCAN_INTERVAL = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL)
@@ -281,11 +282,7 @@ class Sonoff():
                 else:
                     self._devices[idxd]['params'].update(params)
 
-        data = json.dumps({
-            'entity_id' : str(device['deviceid']), 
-            'outlet': params['outlet'] if 'outlet' in params else None, 
-            'params' : params
-        })
+        data = json.dumps({'device_id' : str(device['deviceid']), 'params' : params})
         self.write_debug(data, type='S')
 
     def init_websocket(self):
@@ -306,19 +303,17 @@ class Sonoff():
         _LOGGER.debug('websocket msg: %s', data)
 
         data = json.loads(data)
-        if 'action' in data and data['action'] == 'update' and 'params' in data:
-            if 'switch' in data['params'] or 'switches' in data['params']:
-                for idx, device in enumerate(self._devices):
-                    if device['deviceid'] == data['deviceid']:
-                        self._devices[idx]['params'] = data['params']
+        if 'action' in data and data['action'] in ['update', 'sysmsg'] and 'params' in data:
+            for idx, device in enumerate(self._devices):
+                if device['deviceid'] == data['deviceid']:
 
-                        if 'switches' in data['params']:
-                            for switch in data['params']['switches']:
-                                self.set_entity_state(data['deviceid'], switch['switch'], switch['outlet'])    
-                        else:
-                            self.set_entity_state(data['deviceid'], data['params']['switch'])
+                    # @TODO check for multiple outlets
+                    self._devices[idx]['params'].update(data['params'])
 
-                        break # do not remove
+                    self.set_entity_state(data['deviceid'], data['params'])
+
+                    break # do not remove
+
 
         self.write_debug(json.dumps(data), type='W')
 
@@ -335,12 +330,43 @@ class Sonoff():
 
         return grace_status
 
-    def set_entity_state(self, deviceid, state, outlet=None):
-        entity_id = 'switch.%s%s' % (deviceid, '_'+str(outlet+1) if outlet is not None else '')
-        attr = self._hass.states.get(entity_id).attributes
-        self._hass.states.set(entity_id, state, attr)
+    def get_device_type(self, deviceid): # switch, light, etc
+        device = self.get_device(deviceid)
+        
+        if 'state' in device['params'] and 'switch' not in device['params']:
+            return 'light'
+        elif 'switch' in device['params'] or 'switchs' in device['params']:
+            return 'switch'
 
-        data = json.dumps({'entity_id' : entity_id, 'outlet': outlet, 'state' : state})
+        return None # houston we have a problem here
+
+    def set_entity_state(self, deviceid, params):
+
+        # @TODO update the availability
+        #if 'online' in params:
+        #    pass
+
+        if 'switches' in params:
+            for switch in params['switches']:
+                entity_id = 'switch.%s%s_%s' % ('sonoff_' if self._entity_prefix else '', deviceid, str(switch['switch'] + 1))
+                attr = self._hass.states.get(entity_id).attributes
+
+                self._hass.states.set(entity_id, switch['switch'], attr)
+        else:
+            entity_id = '%s.%s%s' % (self.get_device_type(deviceid), 'sonoff_' if self._entity_prefix else '', deviceid)
+            attr = self._hass.states.get(entity_id).attributes
+
+            if 'switch' in params:
+                state = params['switch']
+
+            elif 'state' in params: # light sonoff b1
+                # @TODO calculate colot_temp & brightness
+
+                state = params['state']
+
+            self._hass.states.set(entity_id, state, attr)
+
+        data = json.dumps({'device_id' : deviceid, 'params': params})
         self.write_debug(data, type='s')
 
     def update_devices(self):
@@ -366,6 +392,16 @@ class Sonoff():
             self.do_login()
 
         self._devices = r.json()
+
+        if self.get_debug_state():
+            import os
+
+            dummy_devices_path = self._hass.config.path('dummy_devices.json')
+            if os.path.isfile(dummy_devices_path):
+                with open(dummy_devices_path, 'r') as f:
+                    dummy_devices = json.load(f)
+
+                self._devices += dummy_devices
 
         self.write_debug(r.text, type='D')
 
