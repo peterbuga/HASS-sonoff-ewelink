@@ -328,7 +328,12 @@ class Sonoff():
         return grace_status
 
     def set_entity_state(self, deviceid, state, outlet=None):
-        entity_id = 'switch.%s%s' % (deviceid, '_'+str(outlet+1) if outlet is not None else '')
+        entity_id = 'switch.%s%s' % (
+            'sonoff_' if self._entity_prefix else '',
+            deviceid, 
+            '_'+str(outlet+1) if outlet is not None else ''
+        )
+        
         attr = self._hass.states.get(entity_id).attributes
         self._hass.states.set(entity_id, state, attr)
 
