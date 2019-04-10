@@ -42,10 +42,18 @@ And copy the *.py files in `custom_components` folder using the same structure l
 
 `entity_prefix` this option removes the `sonoff_` prefix from entities name (it's more or a less a compatibility mode between previous `master` vs `websocket` branch implementations)
 
-`debug` if enabled this will give you the ability to generate a log of messages from ewelink that can be easily posted here to debug/implement new devices. it works by creating a pseudo switch `switch.sonoff_debug` (notice it won't show up automatically in frontend in lovelace you have to **manually add it** or toggle it manually from `Developer tools > Services` section). 
-to generate a sonoff debug log toggle the pseudo-switch ON, the capture of messages starts in the background. now **pick up the phone -> open eWeLink app** and start changing settings of your Sonoff device but not faster than 5 seconds, when you finish, toggle the pseudo-switch OFF and a new (very long) persistent notification will show up, go to `Developer tools > States` section and look for a `persistent_notification.notification` entity (impossible to miss) and copy the message from there (to remove this notifications and others Dismiss them from main HA notifications area and you can restart the process if needed). 
-INFORMATION: it'll be better if you share the device-to-debugged to a 2nd eWeLink account and use this in HA and main one in mobile app
-NOTICE: you should **NOT** leave debug-mode enabled for everyday use, please just please don't!
+### debug log generation / new device / new features requests
+`debug` if enabled this will give you the ability to generate a log of messages from ewelink that can be easily posted here to debug/implement new devices. 
+
+steps and how it works:
+- this option createsa pseudo switch entity `switch.sonoff_debug` (**notice** it won't show up automatically in frontend in lovelace you have to **manually add it** or toggle it from `Developer tools > Services` section). 
+- to generate a sonoff debug log toggle the pseudo-switch ON and the capture of messages will silently start in the background. now **pick up the phone -> open eWeLink app** and start changing settings of your Sonoff device but not faster than 10+ seconds between each change. 
+- when you finish toggle the pseudo-switch OFF and a new (very long) persistent notification will show up. 
+- go to `Developer tools > States` section and look for a `persistent_notification.notification` entity (impossible to miss due to its extremely long attribute text) and copy the message from there (to remove this notifications and others just push the button Dismiss them from main HA notifications area and you can restart the process and generate a new log if needed). 
+
+**INFORMATION**: it'll be better if you share the device-to-debugged to a 2nd eWeLink account and use this in HA and main account in mobile app, this way you won't be logged out of the app anymore and the generated log will be restricted to only 1 device
+
+**NOTICE**: you should **NOT** leave debug-mode enabled for everyday use, please please just don't!
  
 This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (althought I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
 
@@ -59,9 +67,9 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff RF | yes |  |  |  | yes |  | yes |  |
 | Sonoff G1 | ? |  |  |  |  |  |  |  |
 | Sonoff 4CH Pro | yes |  |  | yes |  | yes |  |  |
-| Sonoff 4CH Pro R2 | yes |  |  | yes |  |  |  |  |
+| Sonoff 4CH Pro R2 | yes |  |  | yes |  |  | yes |  |
 | Sonoff S20 | yes |  | yes |  |  |  | yes |  |
-| Sonoff S31 | yes |  |  |  |  |  |  |  |
+| Sonoff S31 | yes |  |  |  |  |  |  | + power/current/voltage sensors |
 | [Sonoff S26](https://www.aliexpress.com/item/Sonoff-S26-WiFi-Smart-Socket-Wireless-Plug-Power-Socket-Smart-Home-Switch-Smart-Remote-Control-for/32956551752.html) | yes |  |  | yes |  |  | yes | version: Euro |
 | Sonoff T1 1C | yes |  |  | yes |  |  |  |  |
 | Sonoff T1 EU 2C | yes |  |  |  |  | yes |  |  |
@@ -83,8 +91,12 @@ This is just a proof of concept because I searched for it and there was no imple
 `yes` = confirmed version, [empty] = unknown for sure 
 
 ## Updates
-- 2019.01.06
-  - create sensors for devices that have support for power/current/voltage/temperature/humidity
+
+- 2019.04.08
+  - HA0.88+ new component structure 
+  - added basic rules to create the same number of switches as presented by the physical device
+- 2019.02.++ alternate faster version with state updates over websocket developed
+- 2019.01.06 create sensors for devices that have support for power/current/voltage/temperature/humidity
 - 2018.12.05 
   - mandarin phone number login support
   - removed `entity_name` option, the entities will have a fixed structure from now on
@@ -92,15 +104,14 @@ This is just a proof of concept because I searched for it and there was no imple
   - ability to control devices with multiple switches 
   - added mobile app specified device-name as default to be listed in HA entity, added `entity_name` option and removed the default `sonoff_` prefix
   - fixed bug that will show device as unavailable in the grace period
-- 2018.11.29 
-  - shared devices from another account can be used also
+- 2018.11.29 shared devices from another account can be used also
 - 2018.11.28 
   - mobile app-like login to the closest region 
   - added `scan_interval` option
   - added `grace_period` option
 
 ## Requests / Bugs
-Feel free to properly ask support for new devices [using these guidelines](https://github.com/peterbuga/HASS-sonoff-ewelink/tree/master/sonoff-debug) / report bugs / request features / fork (& pull request) and I'll try to see what I can do.
+Feel free to properly ask support for new devices using the guidelines mentioned in the section above regarding the `debug` section (or [the older basic version](https://github.com/peterbuga/HASS-sonoff-ewelink/tree/master/sonoff-debug)) / report bugs / request features / fork (& pull request) and I'll try to see what I can do.
 
 ## Credits 
 - most of the logic & code was done (partialy) porting this awesome repo (+those that it extends itself) https://github.com/howanghk/homebridge-ewelink
@@ -109,3 +120,6 @@ Feel free to properly ask support for new devices [using these guidelines](https
 - [@SergeyAnokhin](https://github.com/SergeyAnokhin) for adding power metter info to entity attributes
 - [@Michaelrch](https://community.home-assistant.io/u/michaelrch) for awesome support!
 
+
+## Donate
+Feel free to help me invest in more devices to test and add faster new features to this component! [![paypal](https://www.paypalobjects.com/en_US/IT/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=WXDJJFCULBVSL&source=url)
