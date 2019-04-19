@@ -107,6 +107,8 @@ class SonoffLight(SonoffDevice, LightDevice):
         """Turn the device on."""
         _LOGGER.debug('Light ON: %s', json.dumps(kwargs) )
 
+        params = {}
+
         if 'brightness' in kwargs:
             self._brightness = kwargs['brightness']
 
@@ -231,9 +233,7 @@ class SonoffLight(SonoffDevice, LightDevice):
     def turn_off(self, **kwargs):
         """Turn the device off."""
         _LOGGER.debug('Light OFF: %s', json.dumps(kwargs) )
-
-        if not len(kwargs): # it's ON/OFF state
-            params = {"state" : "off"}
+        params = {"state" : "off"}
 
         self._hass.bus.async_fire('sonoff_state', {
             'deviceid'  : self._deviceid,

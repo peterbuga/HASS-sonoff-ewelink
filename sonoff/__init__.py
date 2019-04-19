@@ -335,7 +335,7 @@ class Sonoff():
         
         if 'state' in device['params'] and 'switch' not in device['params']:
             return 'light'
-        elif 'switch' in device['params'] or 'switchs' in device['params']:
+        elif 'switch' in device['params'] or 'switches' in device['params']:
             return 'switch'
 
         return None # houston we have a problem here
