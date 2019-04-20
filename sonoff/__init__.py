@@ -354,13 +354,16 @@ class Sonoff():
                 self._hass.states.set(entity_id, switch['switch'], attr)
         else:
             entity_id = '%s.%s%s' % (self.get_device_type(deviceid), 'sonoff_' if self._entity_prefix else '', deviceid)
-            attr = self._hass.states.get(entity_id).attributes
+            entity = self._hass.states.get(entity_id).attributes
+            
+            attr = entity.attributes
+            state = entity.state
 
             if 'switch' in params:
                 state = params['switch']
 
             elif 'state' in params: # light sonoff b1
-                # @TODO calculate colot_temp & brightness
+                # @TODO calculate color/color_temp and maybe brightness
 
                 state = params['state']
 
