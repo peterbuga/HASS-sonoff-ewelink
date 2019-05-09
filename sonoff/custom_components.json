@@ -6,8 +6,7 @@
         "visit_repo": "https://github.com/peterbuga/HASS-sonoff-ewelink",
         "resources": [
             "https://github.com/peterbuga/HASS-sonoff-ewelink/blob/master/sonoff/sensor.py",
-            "https://github.com/peterbuga/HASS-sonoff-ewelink/blob/master/sonoff/switch.py",
-            "https://github.com/peterbuga/HASS-sonoff-ewelink/blob/master/sonoff/manifest.json"
+            "https://github.com/peterbuga/HASS-sonoff-ewelink/blob/master/sonoff/switch.py"
         ]
     }
 }
