@@ -23,8 +23,6 @@ CONF_ENTITY_PREFIX  = 'entity_prefix'
 
 DOMAIN              = "sonoff"
 
-REQUIREMENTS = ['uuid', 'websocket-client==0.54.0']
-
 import websocket
 
 _LOGGER = logging.getLogger(__name__)
