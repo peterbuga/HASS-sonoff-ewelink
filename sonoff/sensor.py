@@ -32,8 +32,9 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             if device['params'].get(sensor) and device['params'].get(sensor) != "unavailable":
                 entity = SonoffSensor(hass, device, sensor)
                 entities.append(entity) 
-
-    async_add_entities(entities, update_before_add=False)
+    
+    if len(entities):
+        async_add_entities(entities, update_before_add=False)
 
 class SonoffSensor(SonoffDevice):
     """Representation of a Sonoff sensor."""
