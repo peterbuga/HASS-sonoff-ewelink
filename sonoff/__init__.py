@@ -13,7 +13,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_SCAN_INTERVAL,
     CONF_EMAIL, CONF_PASSWORD, CONF_USERNAME,
-    HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST, 
+    HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST,
     HTTP_UNAUTHORIZED, HTTP_NOT_FOUND)
 
 CONF_API_REGION     = 'api_region'
@@ -31,7 +31,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
-        vol.Exclusive(CONF_USERNAME, CONF_PASSWORD): cv.string, 
+        vol.Exclusive(CONF_USERNAME, CONF_PASSWORD): cv.string,
         vol.Exclusive(CONF_EMAIL, CONF_PASSWORD): cv.string,
 
         vol.Required(CONF_PASSWORD): cv.string,
@@ -40,7 +40,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_SCAN_INTERVAL, default=timedelta(seconds=30)): cv.time_period,
         vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
         vol.Optional(CONF_ENTITY_PREFIX, default=True): cv.boolean,
-        
+
         vol.Optional(CONF_DEBUG, default=False): cv.boolean
     }, extra=vol.ALLOW_EXTRA),
 }, extra=vol.ALLOW_EXTRA)
@@ -66,7 +66,7 @@ async def async_setup(hass, config):
             discovery.load_platform(hass, component, DOMAIN, {}, config)
 
         hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
-	
+
         # close the websocket when HA stops
         # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
 
@@ -89,7 +89,7 @@ class Sonoff():
         self._api_region    = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
         self._entity_prefix = config.get(DOMAIN, {}).get(CONF_ENTITY_PREFIX,'')
         self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
-        
+
         self._sonoff_debug  = config.get(DOMAIN, {}).get(CONF_DEBUG, False)
         self._sonoff_debug_log = []
 
@@ -114,14 +114,14 @@ class Sonoff():
         # if the entities should have `sonoff_` prefixed or not
         # a quick fix between (i-blame-myself) `master` vs. `websocket` implementations
         return self._entity_prefix
-            
+
     def do_login(self):
 
         import uuid
 
         # reset the grace period
         self._skipped_login = 0
-        
+
         app_details = {
             'password'  : self._password,
             'version'   : '6',
@@ -143,10 +143,10 @@ class Sonoff():
         decryptedAppSecret = b'6Nz4n0xA8s8qdxQf2GqurZj2Fs55FUvM'
 
         hex_dig = hmac.new(
-            decryptedAppSecret, 
-            str.encode(json.dumps(app_details)), 
+            decryptedAppSecret,
+            str.encode(json.dumps(app_details)),
             digestmod=hashlib.sha256).digest()
-        
+
         sign = base64.b64encode(hex_dig).decode()
 
         self._headers = {
@@ -154,7 +154,7 @@ class Sonoff():
             'Content-Type'  : 'application/json;charset=UTF-8'
         }
 
-        r = requests.post('https://{}-api.coolkit.cc:8080/api/user/login'.format(self._api_region), 
+        r = requests.post('https://{}-api.coolkit.cc:8080/api/user/login'.format(self._api_region),
             headers=self._headers, json=app_details)
 
         resp = r.json()
@@ -176,7 +176,7 @@ class Sonoff():
                 self._api_region = 'cn'
                 self.do_login()
                 return
-            
+
             else:
                 _LOGGER.error("Couldn't authenticate using the provided credentials!")
 
@@ -189,7 +189,7 @@ class Sonoff():
             self._user_apikey   = resp['user']['apikey']
             self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
 
-            self.update_devices() # to write the devices list 
+            self.update_devices() # to write the devices list
 
             # get/find the websocket host
             if not self._wshost:
@@ -212,8 +212,8 @@ class Sonoff():
 
     async def state_listener(self, event):
         if not self.get_ws().connected:
-            _LOGGER.error('websocket is not connected') 
-            return           
+            _LOGGER.error('websocket is not connected')
+            return
 
         _LOGGER.debug('received state event change from: %s' % event.data['deviceid'])
 
@@ -235,12 +235,12 @@ class Sonoff():
         if not device:
             _LOGGER.error('unknown device to be updated')
             return False
-        
+
         """
         the payload rule is like this:
-          normal device (non-shared) 
+          normal device (non-shared)
               apikey      = login apikey (= device apikey too)
-        
+
           shared device
               apikey      = device apikey
               selfApiKey  = login apikey (yes, it's typed corectly selfApikey and not selfApiKey :|)
@@ -306,7 +306,7 @@ class Sonoff():
 
                         if 'switches' in data['params']:
                             for switch in data['params']['switches']:
-                                self.set_entity_state(data['deviceid'], switch['switch'], switch['outlet'])    
+                                self.set_entity_state(data['deviceid'], switch['switch'], switch['outlet'])
                         else:
                             self.set_entity_state(data['deviceid'], data['params']['switch'])
 
@@ -319,7 +319,7 @@ class Sonoff():
         _LOGGER.error('websocket error: %s' % str(error))
 
     def is_grace_period(self):
-        grace_time_elapsed = self._skipped_login * int(SCAN_INTERVAL.total_seconds()) 
+        grace_time_elapsed = self._skipped_login * int(SCAN_INTERVAL.total_seconds())
         grace_status = grace_time_elapsed < int(self._grace_period.total_seconds())
 
         if grace_status:
@@ -330,23 +330,25 @@ class Sonoff():
     def set_entity_state(self, deviceid, state, outlet=None):
         entity_id = 'switch.%s%s%s' % (
             'sonoff_' if self._entity_prefix else '',
-            deviceid, 
+            deviceid,
             '_'+str(outlet+1) if outlet is not None else ''
         )
-        
-        attr = self._hass.states.get(entity_id).attributes
-        self._hass.states.set(entity_id, state, attr)
+
+        # possible @PATCH when (i assume) the device is reported offline in HA but an update comes from websocket
+        if hasattr(self._hass.states.get(entity_id), 'attributes'):
+            attr = self._hass.states.get(entity_id).attributes
+            self._hass.states.set(entity_id, state, attr)
 
         data = json.dumps({'entity_id' : entity_id, 'outlet': outlet, 'state' : state})
         self.write_debug(data, type='s')
 
     def update_devices(self):
         # we are in the grace period, no updates to the devices
-        if self._skipped_login and self.is_grace_period():          
-            _LOGGER.info("Grace period active")            
+        if self._skipped_login and self.is_grace_period():
+            _LOGGER.info("Grace period active")
             return self._devices
 
-        r = requests.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1'.format(self._api_region, self.get_user_apikey()), 
+        r = requests.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1'.format(self._api_region, self.get_user_apikey()),
             headers=self._headers)
 
         resp = r.json()
@@ -369,7 +371,7 @@ class Sonoff():
         return self._devices
 
     def get_devices(self, force_update = False):
-        if force_update: 
+        if force_update:
             return self.update_devices()
 
         return self._devices
@@ -392,7 +394,7 @@ class Sonoff():
         return self._wshost
 
     async def async_update(self):
-        devices = self.update_devices()  
+        devices = self.update_devices()
 
     def get_outlets(self, device):
         # information found in ewelink app source code
@@ -486,7 +488,7 @@ class Sonoff():
             return name_to_outlets[uiid_to_name[device['uiid']]]
 
         return None
-    
+
     ### sonog_debug.log section ###
     def write_debug(self, data, type = '', new = False):
 
@@ -497,7 +499,7 @@ class Sonoff():
                 self._sonoff_debug_log.append(".\n--------------COPY-FROM-HERE--------------\n\n")
 
             data = json.loads(data)
-            
+
             # remove extra info
             if isinstance(data, list):
                 for idx, d in enumerate(data):
@@ -505,7 +507,7 @@ class Sonoff():
                                 'location','showBrand','brandLogoUrl','__v','_id','ip',
                                 'deviceid','createdAt','devicekey','apikey','partnerApikey','tags']:
                         if k in d.keys(): del d[k]
-                    
+
                     for k in ['staMac','bindInfos','rssi','timers','partnerApikey']:
                         if k in d['params'].keys(): del d['params'][k]
 
@@ -585,9 +587,9 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
         self.connected = False
 
     def run_forever(self, sockopt=None, sslopt=None, ping_interval=0, ping_timeout=None):
-        websocket.WebSocketApp.run_forever( self, 
-                                            sockopt=sockopt, 
-                                            sslopt=sslopt, 
+        websocket.WebSocketApp.run_forever( self,
+                                            sockopt=sockopt,
+                                            sslopt=sslopt,
                                             ping_interval=ping_interval,
                                             ping_timeout=ping_timeout)
 
@@ -607,7 +609,7 @@ class SonoffDevice(Entity):
 
         self._attributes    = {
             'device_id'     : self._deviceid,
-        }       
+        }
 
     def get_device(self):
         for device in self._hass.data[DOMAIN].get_devices():
@@ -620,13 +622,13 @@ class SonoffDevice(Entity):
         device = self.get_device()
 
         # Pow & Pow R2:
-        if 'power' in device['params']: 
+        if 'power' in device['params']:
             self._attributes['power'] = device['params']['power']
-        
+
         # Pow R2 only:
-        if 'current' in device['params']: 
+        if 'current' in device['params']:
             self._attributes['current'] = device['params']['current']
-        if 'voltage' in device['params']: 
+        if 'voltage' in device['params']:
             self._attributes['voltage'] = device['params']['voltage']
 
         # TH10/TH16
@@ -636,7 +638,7 @@ class SonoffDevice(Entity):
             self._attributes['temperature'] = device['params']['currentTemperature']
 
         if 'rssi' in device['params']:
-            self._attributes['rssi'] = device['params']['rssi']            
+            self._attributes['rssi'] = device['params']['rssi']
 
         # the device has more switches
         if self._outlet is not None:
