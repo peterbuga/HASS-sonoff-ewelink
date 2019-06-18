@@ -38,7 +38,7 @@ And copy the *.py files in `custom_components` folder using the same structure l
 
 `grace_period` eWeLink app allows **only one active session at a time**, therefore this will temporarily block HA refreshes for the specified amount (in seconds) to allow (or better said **after**) you to login in the app and do required changes to your devices. following that sonoff component does an internal re-login invalidating the mobile session and the process restarts. (as a workaround for this, you can create a 2nd account and share the devices from main one, therefore one will be used in HA another one in mobile app)
 
-`api_region` this component tries to find, login & connect to the proper region assigned to you. specifying a proper region will help the component to load faster and reconnect after the expired grace period explained above, possible values: `eu` (default), `us`, 'as' or `cn`
+`api_region` this component tries to find, login & connect to the proper region assigned to you. specifying a proper region will help the component to load faster and reconnect after the expired grace period explained above, possible values: `eu` (default), `us`, `as` or `cn`
 
 `entity_prefix` this option removes the `sonoff_` prefix from entities name (it's more or a less a compatibility mode between previous `master` vs `websocket` branch implementations)
 
