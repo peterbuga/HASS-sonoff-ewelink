@@ -60,33 +60,33 @@ This is just a proof of concept because I searched for it and there was no imple
 
 ## Compatibility list
 
-| Model | Supported | 1.6 | 1.8.1 | 2.6 | 2.6.1 | 2.7.1 | 3.0.0 | 3.0.1 | Remarks |
-|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:---:|:-----:|:---:|-------|:-----:|:---:|:---:|--------------------------------------------------------------------------------------------|
-| Sonoff Basic | yes | yes | yes | yes |  |  | yes |   |   |
-| Sonoff Dual | yes |  |  |  |  |  |  |  |   |
-| Sonoff RF | yes |  |  | yes | yes |  | yes |  |   |
-| Sonoff G1 | ? |  |  |  |  |  |  |  |   |
-| Sonoff 4CH Pro | yes |  |  | yes |  | yes |  | yes |   |
-| Sonoff 4CH Pro R2 | yes |  |  | yes |  |  | yes | yes |   |
-| Sonoff S20 | yes |  | yes |  |  |  | yes |  |   |
-| Sonoff S31 | yes |  |  |  |  |  |  |   | + power/current/voltage sensors |
-| [Sonoff S26](https://www.aliexpress.com/item/Sonoff-S26-WiFi-Smart-Socket-Wireless-Plug-Power-Socket-Smart-Home-Switch-Smart-Remote-Control-for/32956551752.html) | yes |  |  | yes |  |  | yes |   | version: Euro |
-| Sonoff T1 1C | yes |  |  | yes |  |  |  |  |   |
-| Sonoff T1 EU 2C | yes |  |  |  |  | yes |  |  |   |
-| Sonoff T1 UK 3C | yes |  |  | yes |  | yes |  |  |   |
-| Sonoff T1 US 3C | yes |  |  |  |  |  |  |  |   |
-| Sonoff Pow | yes |  |  |  |  |  |  |   | + power sensor |
-| Sonoff Pow R2 | yes |  |  |  |  |  |  |   | + power/current/voltage sensors |
-| Sonoff TH10/TH16 | yes |  |  |  |  |  |  |   | + temp/humidity sensors |
-| Sonoff iFan02 | yes |  |  |  |  |  |  |   | it creates 4 switches, 1 for the light and 3 for the various fan speeds |
-| Sonoff HT-TH31 | ? |  |  |  |  |  |  |  |   |
-| [Sonoff Slampher RF](https://www.gearbest.com/smart-light-bulb/pp_1824903.html) | yes |  |  |  |  | yes | yes | yes |   |
-| [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G) | yes |  |  | yes |  |  |  |   | Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app) |
-| [1 Gang Generic Wall Switch](https://www.aliexpress.com/item/1-Gang-US-EU-UK-Plug-Wall-Wifi-Light-Switch-Smart-Touch-LED-Lights-Switch-for/32934184095.html) | yes |  |  | yes |  |  | yes |   | manfufacturer: KingART, model: KING-N1 (according to ewelink app), Chip: PSF-B85 (ESP8285) |
-| WHDTS WiFi Momentary Inching Relay | yes |  |  |  |  |  |  |   | displayed as a switch button |
-| [MHCOZY WiFi Wireless 5V/12V](https://www.amazon.com/gp/product/B07CJ6DSQC/ref=oh_aui_search_detailpage?ie=UTF8&psc=1) | yes |  |  |  |  |  |  |  |   |
-| [Geekcreit 2 Channel AC 85V-250V](https://www.ebay.es/itm/Geekcreit-2-Channel-AC-85V-250V-APP-Remote-Control-WIFI-Wireless-Switch-Socket-F-/162844446103) | yes |  |  |  |  | yes |  |  |   |
-| [Smart Wi-Fi Outlet](https://www.amazon.com/gp/product/B073VK9X49/ref=oh_aui_detailpage_o01_s01?ie=UTF8&psc=1) | yes |  |  |  |  |  |  |  |   |
+| Model | Supported | 1.6 | 1.8.1 | 2.6 | 2.6.1 | 2.7.1 | 3.0.0 | 3.0.1 | 3.3.0 |Remarks |
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:---:|:-----:|:---:|-------|:-----:|:---:|:---:|:---:|--------------------------------------------------------------------------------------|
+| Sonoff Basic | yes | yes | yes | yes |  |  | yes |   |   |   |
+| Sonoff Dual | yes |  |  |  |  |  |  |  |   |   |
+| Sonoff RF | yes |  |  | yes | yes |  | yes |  |   |   |
+| Sonoff G1 | ? |  |  |  |  |  |  |  |   |   |
+| Sonoff 4CH Pro | yes |  |  | yes |  | yes |  | yes |   |   |
+| Sonoff 4CH Pro R2 | yes |  |  | yes |  |  | yes | yes |   |   |
+| Sonoff S20 | yes |  | yes |  |  |  | yes |  |   |   |
+| Sonoff S31 | yes |  |  |  |  |  |  |   |   | + power/current/voltage sensors |
+| [Sonoff S26](https://www.aliexpress.com/item/Sonoff-S26-WiFi-Smart-Socket-Wireless-Plug-Power-Socket-Smart-Home-Switch-Smart-Remote-Control-for/32956551752.html) | yes |  |  | yes |  |  | yes |   | yes | version: Euro |
+| Sonoff T1 1C | yes |  |  | yes |  |  |  |  |   |   |
+| Sonoff T1 EU 2C | yes |  |  |  |  | yes |  |  |   |   |
+| Sonoff T1 UK 3C | yes |  |  | yes |  | yes |  |  |   |   |
+| Sonoff T1 US 3C | yes |  |  |  |  |  |  |  |   |   |
+| Sonoff Pow | yes |  |  |  |  |  |  |   |   | + power sensor |
+| Sonoff Pow R2 | yes |  |  |  |  |  |  |   |   | + power/current/voltage sensors |
+| Sonoff TH10/TH16 | yes |  |  |  |  |  |   |  |   | + temp/humidity sensors |
+| Sonoff iFan02 | yes |  |  |  |  |  |  |   |   | it creates 4 switches, 1 for the light and 3 for the various fan speeds |
+| Sonoff HT-TH31 | ? |  |  |  |  |  |  |  |   |   |
+| [Sonoff Slampher RF](https://www.gearbest.com/smart-light-bulb/pp_1824903.html) | yes |  |  |  |  | yes | yes | yes |   |   |
+| [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G) | yes |  |  | yes |   |  |  |  | yes | Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app) |
+| [1 Gang Generic Wall Switch](https://www.aliexpress.com/item/1-Gang-US-EU-UK-Plug-Wall-Wifi-Light-Switch-Smart-Touch-LED-Lights-Switch-for/32934184095.html) | yes |  |  | yes |  |  | yes |   | yes | manfufacturer: KingART, model: KING-N1 (according to ewelink app), Chip: PSF-B85 (ESP8285) |
+| WHDTS WiFi Momentary Inching Relay | yes |  |  |  |  |   |  |  |   | displayed as a switch button |
+| [MHCOZY WiFi Wireless 5V/12V](https://www.amazon.com/gp/product/B07CJ6DSQC/ref=oh_aui_search_detailpage?ie=UTF8&psc=1) | yes |  |  |  |  |  |  |  |   |   |
+| [Geekcreit 2 Channel AC 85V-250V](https://www.ebay.es/itm/Geekcreit-2-Channel-AC-85V-250V-APP-Remote-Control-WIFI-Wireless-Switch-Socket-F-/162844446103) | yes |  |  |  |  | yes |   |  |  |   |
+| [Smart Wi-Fi Outlet](https://www.amazon.com/gp/product/B073VK9X49/ref=oh_aui_detailpage_o01_s01?ie=UTF8&psc=1) | yes |   |  |  |  |  |  |  |  |   |
 
 `yes` = confirmed version, [empty] = unknown for sure 
 
