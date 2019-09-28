@@ -80,7 +80,7 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff TH10/TH16 | yes |  |  |  |  |  |   |  |   | + temp/humidity sensors |
 | Sonoff iFan02 | yes |  |  |  |  |  |  |   |   | it creates 4 switches, 1 for the light and 3 for the various fan speeds |
 | Sonoff HT-TH31 | ? |  |  |  |  |  |  |  |   |   |
-| [Sonoff Slampher RF](https://www.gearbest.com/smart-light-bulb/pp_1824903.html) | yes |  |  |  |  | yes | yes | yes |   |   |
+| [Sonoff Slampher RF](https://www.gearbest.com/smart-light-bulb/pp_1824903.html) | yes |  |  |  |  | yes | yes | yes | yes |   |
 | [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G) | yes |  |  | yes |   |  |  |  | yes | Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app) |
 | [1 Gang Generic Wall Switch](https://www.aliexpress.com/item/1-Gang-US-EU-UK-Plug-Wall-Wifi-Light-Switch-Smart-Touch-LED-Lights-Switch-for/32934184095.html) | yes |  |  | yes |  |  | yes |   | yes | manfufacturer: KingART, model: KING-N1 (according to ewelink app), Chip: PSF-B85 (ESP8285) |
 | WHDTS WiFi Momentary Inching Relay | yes |  |  |  |  |   |  |  |   | displayed as a switch button |
