@@ -23,7 +23,7 @@ CONF_ENTITY_PREFIX  = 'entity_prefix'
 
 DOMAIN              = "sonoff"
 
-REQUIREMENTS = ['uuid', 'websocket-client==0.54.0']
+REQUIREMENTS        = ['uuid', 'websocket-client==0.54.0']
 
 import websocket
 
@@ -52,14 +52,6 @@ async def async_setup(hass, config):
 
     hass.data[DOMAIN] = Sonoff(hass, config)
 
-    if hass.data[DOMAIN].get_debug_state():
-        SCAN_INTERVAL = timedelta(seconds=10)
-    else:
-        if config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL) > timedelta(seconds=60):
-            SCAN_INTERVAL = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL)
-        else:
-            SCAN_INTERVAL = timedelta(seconds=60)
-
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
 
         for component in ['switch','sensor']:
@@ -73,7 +65,7 @@ async def async_setup(hass, config):
         def update_devices(event_time):
             run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
 
-        async_track_time_interval(hass, update_devices, SCAN_INTERVAL)
+        async_track_time_interval(hass, update_devices, hass.data[DOMAIN].get_scan_interval())
 
     return True
 
@@ -89,7 +81,7 @@ class Sonoff():
         self._api_region    = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
         self._entity_prefix = config.get(DOMAIN, {}).get(CONF_ENTITY_PREFIX,'')
         self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
-        self._scan_interval = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL,'')
+        self._scan_interval = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL)
 
         self._sonoff_debug  = config.get(DOMAIN, {}).get(CONF_DEBUG, False)
         self._sonoff_debug_log = []
@@ -107,6 +99,15 @@ class Sonoff():
 
         self.write_debug('{}', new=True)
         self.do_login()
+
+    def get_scan_interval(self):
+        if self._hass.data[DOMAIN].get_debug_state():
+            self._scan_interval = timedelta(seconds=10)
+
+        elif self._scan_interval < timedelta(seconds=60):
+            self._scan_interval = timedelta(seconds=60)
+
+        return self._scan_interval
 
     def get_debug_state(self):
         return self._sonoff_debug
@@ -320,7 +321,7 @@ class Sonoff():
         _LOGGER.error('websocket error: %s' % str(error))
 
     def is_grace_period(self):
-        grace_time_elapsed = self._skipped_login * int(self._scan_interval.total_seconds())
+        grace_time_elapsed = self._skipped_login * int(self.get_scan_interval().total_seconds())
         grace_status = grace_time_elapsed < int(self._grace_period.total_seconds())
 
         if grace_status:
