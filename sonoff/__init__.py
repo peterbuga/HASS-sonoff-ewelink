@@ -89,6 +89,7 @@ class Sonoff():
         self._api_region    = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
         self._entity_prefix = config.get(DOMAIN, {}).get(CONF_ENTITY_PREFIX,'')
         self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
+        self._scan_interval = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL,'')
 
         self._sonoff_debug  = config.get(DOMAIN, {}).get(CONF_DEBUG, False)
         self._sonoff_debug_log = []
@@ -319,7 +320,7 @@ class Sonoff():
         _LOGGER.error('websocket error: %s' % str(error))
 
     def is_grace_period(self):
-        grace_time_elapsed = self._skipped_login * int(SCAN_INTERVAL.total_seconds())
+        grace_time_elapsed = self._skipped_login * int(self._scan_interval.total_seconds())
         grace_status = grace_time_elapsed < int(self._grace_period.total_seconds())
 
         if grace_status:
