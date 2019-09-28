@@ -101,7 +101,7 @@ class Sonoff():
         self.do_login()
 
     def get_scan_interval(self):
-        if self._hass.data[DOMAIN].get_debug_state():
+        if DOMAIN in self._hass.data and self._hass.data[DOMAIN].get_debug_state():
             self._scan_interval = timedelta(seconds=10)
 
         elif self._scan_interval < timedelta(seconds=60):
@@ -635,7 +635,7 @@ class SonoffDevice(Entity):
 
         if 'dusty' in device['params']:
             self._attributes['dusty'] = device['params']['dusty']
-        if 'light' in device['light']:
+        if 'light' in device['params']:
             self._attributes['light'] = device['params']['light']
         if 'noise' in device['params']:
             self._attributes['noise'] = device['params']['noise']
