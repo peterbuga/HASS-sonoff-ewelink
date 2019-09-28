@@ -633,11 +633,23 @@ class SonoffDevice(Entity):
         if 'voltage' in device['params']:
             self._attributes['voltage'] = device['params']['voltage']
 
+        if 'dusty' in device['params']:
+            self._attributes['dusty'] = device['params']['dusty']
+        if 'light' in device['light']:
+            self._attributes['light'] = device['params']['light']
+        if 'noise' in device['params']:
+            self._attributes['noise'] = device['params']['noise']
+
         # TH10/TH16
         if 'currentHumidity' in device['params'] and device['params']['currentHumidity'] != "unavailable":
             self._attributes['humidity'] = device['params']['currentHumidity']
         if 'currentTemperature' in device['params'] and device['params']['currentTemperature'] != "unavailable":
             self._attributes['temperature'] = device['params']['currentTemperature']
+
+        if 'humidity' in device['params'] and device['params']['humidity'] != "unavailable":
+            self._attributes['humidity'] = device['params']['humidity']
+        if 'temperature' in device['params'] and device['params']['temperature'] != "unavailable":
+            self._attributes['temperature'] = device['params']['temperature']
 
         if 'rssi' in device['params']:
             self._attributes['rssi'] = device['params']['rssi']
