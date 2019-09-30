@@ -356,7 +356,7 @@ class Sonoff():
         resp = r.json()
         if 'error' in resp and resp['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED]:
             # @IMPROVE add maybe a service call / switch to deactivate sonoff component
-            if self.is_grace_period():
+            if self._devices and self.is_grace_period():
                 _LOGGER.warning("Grace period activated!")
 
                 # return the current (and possible old) state of devices
