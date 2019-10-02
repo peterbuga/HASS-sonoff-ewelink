@@ -76,6 +76,7 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff T1 EU 2C | yes |  |  |  |  | yes |  |  |   |   |
 | Sonoff T1 UK 3C | yes |  |  | yes |  | yes |  |  |   |   |
 | Sonoff T1 US 3C | yes |  |  |  |  |  |  |  |   |   |
+| Sonoff TX 1C | yes |  |  |  |  |  |  |  | yes  |   |
 | Sonoff Pow | yes |  |  |  |  |  |  |   |   | + power sensor |
 | Sonoff Pow R2 | yes |  |  |  |  |  |  |   | partial **NO sensors data!** | + power/current/voltage sensors |
 | Sonoff TH10/TH16 | yes |  |  |  |  |  |   |  |   | + temp/humidity sensors |
