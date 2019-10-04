@@ -344,6 +344,10 @@ class Sonoff():
         self.write_debug(data, type='s')
 
     def update_devices(self):
+        if self.get_user_apikey() is None:
+            _LOGGER.error("Initial login failed, devices cannot be updated!")
+            return self._devices
+
         # we are in the grace period, no updates to the devices
         if self._skipped_login and self.is_grace_period():
             _LOGGER.info("Grace period active")
