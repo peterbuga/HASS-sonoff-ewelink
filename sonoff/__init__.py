@@ -1,13 +1,13 @@
 # The domain of your component. Should be equal to the name of your component.
 import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading, hashlib
 import voluptuous as vol
+import asyncio
 
 from datetime import timedelta
 from datetime import datetime
 
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.util.async_ import run_coroutine_threadsafe
 from homeassistant.helpers import discovery
 from homeassistant.helpers import config_validation as cv
 from homeassistant.const import (
@@ -63,7 +63,7 @@ async def async_setup(hass, config):
         # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
 
         def update_devices(event_time):
-            run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
+            asyncio.run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
 
         async_track_time_interval(hass, update_devices, hass.data[DOMAIN].get_scan_interval())
 
@@ -170,14 +170,13 @@ class Sonoff():
 
             # re-login using the new localized endpoint
             self.do_login()
-            return
 
         elif 'error' in resp and resp['error'] in [HTTP_NOT_FOUND, HTTP_BAD_REQUEST]:
             # (most likely) login with +86... phone number and region != cn
-            if '@' not in self._username and self._api_region != 'cn':
-                self._api_region = 'cn'
-                self.do_login()
-                return
+            if '@' not in self._username and self._api_region in ['eu', 'us']:
+                # self._api_region = 'cn'
+                # self.do_login()
+                _LOGGER.error('Login failed! try to change the api_region to \'cn\' OR \'as\'')
 
             else:
                 _LOGGER.error("Couldn't authenticate using the provided credentials!")
