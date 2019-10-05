@@ -90,9 +90,9 @@ class Sonoff():
             self._username = self._email.strip()
 
         self._skipped_login = 0
-        self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
 
         self._devices       = []
+        self._devices_registered = False
         self._user_apikey   = None
         self._ws            = None
         self._wshost        = None
@@ -359,7 +359,7 @@ class Sonoff():
         resp = r.json()
         if 'error' in resp and resp['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED]:
             # @IMPROVE add maybe a service call / switch to deactivate sonoff component
-            if self.is_grace_period():
+            if self._devices_registered and self.is_grace_period():
                 _LOGGER.warning("Grace period activated!")
 
                 # return the current (and possible old) state of devices
@@ -370,6 +370,7 @@ class Sonoff():
             self.do_login()
 
         self._devices = r.json()
+        self._devices_registered = True
 
         self.write_debug(r.text, type='D')
 
@@ -399,7 +400,7 @@ class Sonoff():
         return self._wshost
 
     async def async_update(self):
-        devices = self.update_devices()
+        self.update_devices()
 
     def get_outlets(self, device):
         # information found in ewelink app source code
