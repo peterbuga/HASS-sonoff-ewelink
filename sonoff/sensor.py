@@ -30,7 +30,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     """Add the Sonoff Sensor entities"""
 
     entities = []
-    for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = True):
+    for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = False):
         # as far as i know only 1-switch devices seem to have sensor-like capabilities
 
         if 'params' not in device.keys(): continue # this should never happen... but just in case

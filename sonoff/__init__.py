@@ -1,5 +1,5 @@
 # The domain of your component. Should be equal to the name of your component.
-import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading, hashlib
+import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading, hashlib, string
 import voluptuous as vol
 import asyncio
 
@@ -124,17 +124,34 @@ class Sonoff():
         # reset the grace period
         self._skipped_login = 0
 
+        self._model         = 'iPhone' + random.choice(['6,1', '6,2', '7,1', '7,2', '8,1', '8,2', '8,4', '9,1', '9,2', '9,3', '9,4', '10,1', '10,2', '10,3', '10,4', '10,5', '10,6', '11,2', '11,4', '11,6', '11,8'])
+        self._romVersion    = random.choice([
+            '10.0', '10.0.2', '10.0.3', '10.1', '10.1.1', '10.2', '10.2.1', '10.3', '10.3.1', '10.3.2', '10.3.3', '10.3.4',
+            '11.0', '11.0.1', '11.0.2', '11.0.3', '11.1', '11.1.1', '11.1.2', '11.2', '11.2.1', '11.2.2', '11.2.3', '11.2.4', '11.2.5', '11.2.6', '11.3', '11.3.1', '11.4', '11.4.1',
+            '12.0', '12.0.1', '12.1', '12.1.1', '12.1.2', '12.1.3', '12.1.4', '12.2', '12.3', '12.3.1', '12.3.2', '12.4', '12.4.1', '12.4.2',
+            '13.0', '13.1', '13.1.1', '13.1.2', '13.2'
+        ])
+        self._appVersion    = random.choice(['3.5.3', '3.5.4', '3.5.6', '3.5.8', '3.5.10', '3.5.12', '3.6.0', '3.6.1', '3.7.0', '3.8.0', '3.9.0', '3.9.1', '3.10.0', '3.11.0'])
+        self._imei          = str(uuid.uuid4())
+
+        _LOGGER.debug(json.dumps({
+            'model'         : self._model,
+            'romVersion'    : self._romVersion,
+            'appVersion'    : self._appVersion,
+            'imei'          : self._imei
+        }))
+
         app_details = {
             'password'  : self._password,
             'version'   : '6',
             'ts'        : int(time.time()),
-            'nonce'     : ''.join([str(random.randint(0, 9)) for i in range(15)]),
+            'nonce'     : ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8)),
             'appid'     : 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq',
-            'imei'      : str(uuid.uuid4()),
+            'imei'      : self._imei,
             'os'        : 'iOS',
-            'model'     : 'iPhone10,6',
-            'romVersion': '11.1.2',
-            'appVersion': '3.5.3'
+            'model'     : self._model,
+            'romVersion': self._romVersion,
+            'appVersion': self._appVersion
         }
 
         if re.match(r'[^@]+@[^@]+\.[^@]+', self._username):
@@ -353,8 +370,11 @@ class Sonoff():
             _LOGGER.info("Grace period active")
             return self._devices
 
-        r = requests.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1'.format(self._api_region, self.get_user_apikey()),
-            headers=self._headers)
+        r = requests.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1&version=6&ts=%s&nonce=%s&appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq&imei=%s&os=iOS&model=%s&romVersion=%s&appVersion=%s'.format(
+            self._api_region, self.get_user_apikey(), str(int(time.time())), ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8)), self._imei, self._model, self._romVersion, self._appVersion
+            ), headers=self._headers)
+
+        # _LOGGER.error(r.text)
 
         resp = r.json()
         if 'error' in resp and resp['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED]:
@@ -369,7 +389,7 @@ class Sonoff():
             _LOGGER.info("Re-login component")
             self.do_login()
 
-        self._devices = r.json()
+        self._devices = r.json()['devicelist'] if 'devicelist' in r.json() else r.json()
 
         self.write_debug(r.text, type='D')
 
@@ -397,6 +417,12 @@ class Sonoff():
 
     def get_wshost(self):
         return self._wshost
+
+    def get_model(self):
+        return self._model
+
+    def get_romVersion(self):
+        return self._romVersion
 
     async def async_update(self):
         devices = self.update_devices()
@@ -574,14 +600,14 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
             'action'    : "userOnline",
             'userAgent' : 'app',
             'version'   : 6,
-            'nonce'     : ''.join([str(random.randint(0, 9)) for i in range(15)]),
+            'nonce'     : ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8)),
             'apkVesrion': "1.8",
-            'os'        : 'ios',
+            'os'        : 'iOS',
             'at'        : self._sonoff.get_bearer_token(),
             'apikey'    : self._sonoff.get_user_apikey(),
             'ts'        : str(int(time.time())),
-            'model'     : 'iPhone10,6',
-            'romVersion': '11.1.2',
+            'model'     : self._sonoff.get_model(),
+            'romVersion': self._sonoff.get_romVersion(),
             'sequence'  : str(time.time()).replace('.','')
         }
 
