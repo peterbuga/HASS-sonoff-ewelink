@@ -80,7 +80,6 @@ class Sonoff():
         self._password      = config.get(DOMAIN, {}).get(CONF_PASSWORD,'')
         self._api_region    = config.get(DOMAIN, {}).get(CONF_API_REGION,'')
         self._entity_prefix = config.get(DOMAIN, {}).get(CONF_ENTITY_PREFIX,'')
-        self._grace_period  = timedelta(seconds=config.get(DOMAIN, {}).get(CONF_GRACE_PERIOD,''))
         self._scan_interval = config.get(DOMAIN, {}).get(CONF_SCAN_INTERVAL)
 
         self._sonoff_debug  = config.get(DOMAIN, {}).get(CONF_DEBUG, False)
@@ -601,7 +600,7 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
             'userAgent' : 'app',
             'version'   : 6,
             'nonce'     : ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8)),
-            'apkVesrion': "1.8",
+            'apkVersion': "1.8",
             'os'        : 'iOS',
             'at'        : self._sonoff.get_bearer_token(),
             'apikey'    : self._sonoff.get_user_apikey(),
