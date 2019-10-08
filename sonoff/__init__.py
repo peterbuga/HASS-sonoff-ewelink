@@ -54,7 +54,7 @@ async def async_setup(hass, config):
 
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
 
-        for component in ['switch','sensor']:
+        for component in ['switch', 'sensor', 'fan']:
             discovery.load_platform(hass, component, DOMAIN, {}, config)
 
         hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
@@ -98,6 +98,71 @@ class Sonoff():
 
         self.write_debug('{}', new=True)
         self.do_login()
+
+        # lazy to store this in another place for now...
+        self.uiid_to_name = {
+            1       : "SOCKET",
+            2       : "SOCKET_2",
+            3       : "SOCKET_3",
+            4       : "SOCKET_4",
+            5       : "SOCKET_POWER",
+            6       : "SWITCH",
+            7       : "SWITCH_2",
+            8       : "SWITCH_3",
+            9       : "SWITCH_4",
+            10      : "OSPF",
+            11      : "CURTAIN",
+            12      : "EW-RE",
+            13      : "FIREPLACE",
+            14      : "SWITCH_CHANGE",
+            15      : "THERMOSTAT",
+            16      : "COLD_WARM_LED",
+            17      : "THREE_GEAR_FAN",
+            18      : "SENSORS_CENTER",
+            19      : "HUMIDIFIER",
+            22      : "RGB_BALL_LIGHT",
+            23      : "NEST_THERMOSTAT",
+            24      : "GSM_SOCKET",
+            25      : 'AROMATHERAPY',
+            26      : "RuiMiTeWenKongQi",
+            27      : "GSM_UNLIMIT_SOCKET",
+            28      : "RF_BRIDGE",
+            29      : "GSM_SOCKET_2",
+            30      : "GSM_SOCKET_3",
+            31      : "GSM_SOCKET_4",
+            32      : "POWER_DETECTION_SOCKET",
+            33      : "LIGHT_BELT",
+            34      : "FAN_LIGHT",
+            35      : "EZVIZ_CAMERA",
+            36      : "SINGLE_CHANNEL_DIMMER_SWITCH",
+            38      : "HOME_KIT_BRIDGE",
+            40      : "FUJIN_OPS",
+            41      : "CUN_YOU_DOOR",
+            42      : "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT",
+            43      : "",
+            44      : "",
+            45      : "DOWN_CEILING_LIGHT",
+            46      : "AIR_CLEANER",
+            49      : "MACHINE_BED",
+            51      : "COLD_WARM_DESK_LIGHT",
+            52      : "DOUBLE_COLOR_DEMO_LIGHT",
+            53      : "ELECTRIC_FAN_WITH_LAMP",
+            55      : "SWEEPING_ROBOT",
+            56      : "RGB_BALL_LIGHT_4",
+            57      : "MONOCHROMATIC_BALL_LIGHT",
+            59      : "MUSIC_LIGHT_BELT",
+            60      : "NEW_HUMIDIFIER",
+            61      : "KAI_WEI_ROUTER",
+            62      : "MEARICAMERA",
+            66      : "ZIGBEE_MAIN_DEVICE",
+            67      : "RollingDoor",
+            68      : "KOOCHUWAH",
+            1001    : "BLADELESS_FAN",
+            1003    : "WARM_AIR_BLOWER",
+            1000    : "ZIGBEE_SINGLE_SWITCH",
+            1770    : "ZIGBEE_TEMPERATURE_SENSOR",
+            1256    : "ZIGBEE_LIGHT"
+        }
 
     def get_scan_interval(self):
         if DOMAIN in self._hass.data and self._hass.data[DOMAIN].get_debug_state():
@@ -265,6 +330,10 @@ class Sonoff():
         if outlet is not None:
             params = { 'switches' : device['params']['switches'] }
             params['switches'][outlet]['switch'] = new_state
+
+            if 'switches' in event.data: # rest of the outlets for iFan
+                for oidx in event.data['switches']:
+                    params['switches'][oidx]['switch'] = event.data['switches'][oidx]
 
         else:
             params = { 'switch' : new_state }
@@ -449,75 +518,14 @@ class Sonoff():
             'CUN_YOU_DOOR'          : 4
         }
 
-        uiid_to_name = {
-            1       : "SOCKET",
-            2       : "SOCKET_2",
-            3       : "SOCKET_3",
-            4       : "SOCKET_4",
-            5       : "SOCKET_POWER",
-            6       : "SWITCH",
-            7       : "SWITCH_2",
-            8       : "SWITCH_3",
-            9       : "SWITCH_4",
-            10      : "OSPF",
-            11      : "CURTAIN",
-            12      : "EW-RE",
-            13      : "FIREPLACE",
-            14      : "SWITCH_CHANGE",
-            15      : "THERMOSTAT",
-            16      : "COLD_WARM_LED",
-            17      : "THREE_GEAR_FAN",
-            18      : "SENSORS_CENTER",
-            19      : "HUMIDIFIER",
-            22      : "RGB_BALL_LIGHT",
-            23      : "NEST_THERMOSTAT",
-            24      : "GSM_SOCKET",
-            25      : 'AROMATHERAPY',
-            26      : "RuiMiTeWenKongQi",
-            27      : "GSM_UNLIMIT_SOCKET",
-            28      : "RF_BRIDGE",
-            29      : "GSM_SOCKET_2",
-            30      : "GSM_SOCKET_3",
-            31      : "GSM_SOCKET_4",
-            32      : "POWER_DETECTION_SOCKET",
-            33      : "LIGHT_BELT",
-            34      : "FAN_LIGHT",
-            35      : "EZVIZ_CAMERA",
-            36      : "SINGLE_CHANNEL_DIMMER_SWITCH",
-            38      : "HOME_KIT_BRIDGE",
-            40      : "FUJIN_OPS",
-            41      : "CUN_YOU_DOOR",
-            42      : "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT",
-            43      : "",
-            44      : "",
-            45      : "DOWN_CEILING_LIGHT",
-            46      : "AIR_CLEANER",
-            49      : "MACHINE_BED",
-            51      : "COLD_WARM_DESK_LIGHT",
-            52      : "DOUBLE_COLOR_DEMO_LIGHT",
-            53      : "ELECTRIC_FAN_WITH_LAMP",
-            55      : "SWEEPING_ROBOT",
-            56      : "RGB_BALL_LIGHT_4",
-            57      : "MONOCHROMATIC_BALL_LIGHT",
-            59      : "MUSIC_LIGHT_BELT",
-            60      : "NEW_HUMIDIFIER",
-            61      : "KAI_WEI_ROUTER",
-            62      : "MEARICAMERA",
-            66      : "ZIGBEE_MAIN_DEVICE",
-            67      : "RollingDoor",
-            68      : "KOOCHUWAH",
-            1001    : "BLADELESS_FAN",
-            1003    : "WARM_AIR_BLOWER",
-            1000    : "ZIGBEE_SINGLE_SWITCH",
-            1770    : "ZIGBEE_TEMPERATURE_SENSOR",
-            1256    : "ZIGBEE_LIGHT"
-        }
-
-        if device['uiid'] in uiid_to_name.keys() and \
-            uiid_to_name[device['uiid']] in name_to_outlets.keys():
-            return name_to_outlets[uiid_to_name[device['uiid']]]
+        if device['uiid'] in self.uiid_to_name.keys() and \
+            self.uiid_to_name[device['uiid']] in name_to_outlets.keys():
+            return name_to_outlets[self.uiid_to_name[device['uiid']]]
 
         return None
+
+    def device_type_by_uiid(self, device):
+        return self.uiid_to_name.get(device['uiid'], None)
 
     ### sonog_debug.log section ###
     def write_debug(self, data, type = '', new = False):
