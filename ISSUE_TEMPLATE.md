@@ -1,0 +1,3 @@
+**delete this template text while filling your issue/request but before that please check if:**
+- do you have the latest version of the code in use? (this is a very common problem & fix that everyone ignores)
+- did you gave a quick look to the other issues to see if the issue is already reported? (otherwise i will close the issue without any response. it takes me good hours to develop & manage this plugin, you can take 3 minutes to do a quick reading)
