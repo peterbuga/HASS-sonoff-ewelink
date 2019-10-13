@@ -5,7 +5,7 @@ Simple Home Assistant component to add/control Sonoff/eWeLink smart devices usin
 ### WARNING: completely deactivate the `sonoff` component from HA while doing a firmware update, due to auto-relogin function you might be kicked out of the app before the process is completed. I would not be held liable for any problems occuring if not following this steps!
 ***
 
-**CHECK COMPATIBILITY LIST BELOW (not everyday updated)! 
+**CHECK COMPATIBILITY LIST BELOW (not everyday updated)!
 TRY THE COMPONENT FIRST AND IF IT DOESN'T WORK FOR YOUR DEVICE DON'T COMPLAIN AND OPEN A PROPER ISSUE**
 
 ## Setup
@@ -43,18 +43,18 @@ And copy the *.py files in `custom_components` folder using the same structure l
 `entity_prefix` this option removes the `sonoff_` prefix from entities name (it's more or a less a compatibility mode between previous `master` vs `websocket` branch implementations)
 
 ### debug log generation / new device / new features requests
-`debug` if enabled this will give you the ability to generate a log of messages from ewelink that can be easily posted here to debug/implement new devices. 
+`debug` if enabled this will give you the ability to generate a log of messages from ewelink that can be easily posted here to debug/implement new devices.
 
 steps and how it works:
-- this option createsa pseudo switch entity `switch.sonoff_debug` (**notice** it won't show up automatically in frontend in lovelace you have to **manually add it** or toggle it from `Developer tools > Services` section). 
-- to generate a sonoff debug log toggle the pseudo-switch ON and the capture of messages will silently start in the background. now **pick up the phone -> open eWeLink app** and start changing settings of your Sonoff device but not faster than 10+ seconds between each change. 
-- when you finish toggle the pseudo-switch OFF and a new (very long) persistent notification will show up. 
-- go to `Developer tools > States` section and look for a `persistent_notification.notification` entity (impossible to miss due to its extremely long attribute text) and copy the message from there (to remove this notifications and others just push the button Dismiss them from main HA notifications area and you can restart the process and generate a new log if needed). 
+- this option createsa pseudo switch entity `switch.sonoff_debug` (**notice** it won't show up automatically in frontend in lovelace you have to **manually add it** or toggle it from `Developer tools > Services` section).
+- to generate a sonoff debug log toggle the pseudo-switch ON and the capture of messages will silently start in the background. now **pick up the phone -> open eWeLink app** and start changing settings of your Sonoff device but not faster than 10+ seconds between each change.
+- when you finish toggle the pseudo-switch OFF and a new (very long) persistent notification will show up.
+- go to `Developer tools > States` section and look for a `persistent_notification.notification` entity (impossible to miss due to its extremely long attribute text) and copy the message from there (to remove this notifications and others just push the button Dismiss them from main HA notifications area and you can restart the process and generate a new log if needed).
 
 **INFORMATION**: it'll be better if you share the device-to-debugged to a 2nd eWeLink account and use this in HA and main account in mobile app, this way you won't be logged out of the app anymore and the generated log will be restricted to only 1 device
 
 **NOTICE**: you should **NOT** leave debug-mode enabled for everyday use, please please just don't!
- 
+
 This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (althought I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
 
 
@@ -62,7 +62,8 @@ This is just a proof of concept because I searched for it and there was no imple
 
 | Model                                                                                                                                                             | Supported | 1.6 | 1.8.1 | 2.6 | 2.6.1 | 2.7.0 | 2.7.1 | 3.0.0 | 3.0.1 |             3.3.0            | Remarks                                                                                    |
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------:|:---:|:-----:|:---:|-------|-------|:-----:|:-----:|:-----:|:----------------------------:|--------------------------------------------------------------------------------------------|
-| Sonoff Basic                                                                                                                                                      |    yes    | yes |  yes  | yes |       |       |       |  yes  |       |                              |                                                                                            |
+| Sonoff Basic                                                                                                                                                      |    yes    |     |       |     |       |       |       |       |       |              yes             |                                                                                            |
+| Sonoff Mini                                                                                                                                                       |    yes    | yes |  yes  | yes |       |       |       |  yes  |       |                              |                                                                                            |
 | Sonoff Dual                                                                                                                                                       |    yes    |     |       |     |       |       |       |       |       |                              |                                                                                            |
 | Sonoff RF                                                                                                                                                         |    yes    |     |       | yes | yes   |       |       |  yes  |       |                              |                                                                                            |
 | Sonoff SC (retired)                                                                                                                                               |           |     |       |     |       | yes   |       |       |       |                              | hum/temp/dust/light/noise sensors                                                          |
@@ -91,32 +92,32 @@ This is just a proof of concept because I searched for it and there was no imple
 | [MHCOZY WiFi Wireless 5V/12V](https://www.amazon.com/gp/product/B07CJ6DSQC/ref=oh_aui_search_detailpage?ie=UTF8&psc=1)                                            |    yes    |     |       |     |       |       |       |       |       |                              |                                                                                            |
 | [Geekcreit 2 Channel AC 85V-250V](https://www.ebay.es/itm/Geekcreit-2-Channel-AC-85V-250V-APP-Remote-Control-WIFI-Wireless-Switch-Socket-F-/162844446103)         |    yes    |     |       |     |       |       |  yes  |       |       |                              |                                                                                            |
 | [Smart Wi-Fi Outlet](https://www.amazon.com/gp/product/B073VK9X49/ref=oh_aui_detailpage_o01_s01?ie=UTF8&psc=1)                                                    |    yes    |     |       |     |       |       |       |       |       |                              |                                                                                            |
-`yes` = confirmed version, [empty] = unknown for sure 
+`yes` = confirmed version, [empty] = unknown for sure
 
 ## Updates
 
 - 2019.04.08
-  - HA0.88+ new component structure 
+  - HA0.88+ new component structure
   - added basic rules to create the same number of switches as presented by the physical device
 - 2019.02.++ alternate faster version with state updates over websocket developed
 - 2019.01.06 create sensors for devices that have support for power/current/voltage/temperature/humidity
-- 2018.12.05 
+- 2018.12.05
   - mandarin phone number login support
   - removed `entity_name` option, the entities will have a fixed structure from now on
 - 2018.12.01
-  - ability to control devices with multiple switches 
+  - ability to control devices with multiple switches
   - added mobile app specified device-name as default to be listed in HA entity, added `entity_name` option and removed the default `sonoff_` prefix
   - fixed bug that will show device as unavailable in the grace period
 - 2018.11.29 shared devices from another account can be used also
-- 2018.11.28 
-  - mobile app-like login to the closest region 
+- 2018.11.28
+  - mobile app-like login to the closest region
   - added `scan_interval` option
   - added `grace_period` option
 
 ## Requests / Bugs
 Feel free to properly ask support for new devices using the guidelines mentioned in the section above regarding the `debug` section (or [the older basic version](https://github.com/peterbuga/HASS-sonoff-ewelink/tree/master/sonoff-debug)) / report bugs / request features / fork (& pull request) and I'll try to see what I can do.
 
-## Credits 
+## Credits
 - most of the logic & code was done (partially) porting this awesome repo (+those that it extends itself) https://github.com/howanghk/homebridge-ewelink
 - [@2016for](https://github.com/2016for) for assisting me with properly integrating the switches with multiple outlets
 - [@fireinice](https://github.com/fireinice) for providing the mandarin implementation
