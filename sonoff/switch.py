@@ -14,6 +14,11 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = True):
         outlets_number = hass.data[SONOFF_DOMAIN].get_outlets(device)
 
+        # @TODO figure out a better way to detect sonoff iFan02 (or probably iFan03)
+        # this entity will be split and picked up by `light` + `fan` entities
+        if 'FAN' in hass.data[SONOFF_DOMAIN].device_type_by_uiid(device):
+            continue
+
         if outlets_number is None: # fallback to whatever the device might have
             if 'switches' in device['params']: # the device has multiple switches, split them by outlets
                 for outlet in device['params']['switches']:
