@@ -92,6 +92,7 @@ This is just a proof of concept because I searched for it and there was no imple
 | [MHCOZY WiFi Wireless 5V/12V](https://www.amazon.com/gp/product/B07CJ6DSQC/ref=oh_aui_search_detailpage?ie=UTF8&psc=1)                                            |    yes    |     |       |     |       |       |       |       |       |                              |                                                                                            |
 | [Geekcreit 2 Channel AC 85V-250V](https://www.ebay.es/itm/Geekcreit-2-Channel-AC-85V-250V-APP-Remote-Control-WIFI-Wireless-Switch-Socket-F-/162844446103)         |    yes    |     |       |     |       |       |  yes  |       |       |                              |                                                                                            |
 | [Smart Wi-Fi Outlet](https://www.amazon.com/gp/product/B073VK9X49/ref=oh_aui_detailpage_o01_s01?ie=UTF8&psc=1)                                                    |    yes    |     |       |     |       |       |       |       |       |                              |                                                                                            |
+| Sonoff Mini                                                    |    yes    |     |       |     |       |       |       |   yes    |       |            yes                  |                                                                                            |
 
 `yes` = confirmed version, [empty] = unknown for sure 
 
