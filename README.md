@@ -2,7 +2,7 @@
 Simple Home Assistant component to add/control Sonoff/eWeLink smart devices using the stock firmware and retaining the cloud capabilities.
 
 ***
-### WARNING: completely deactivate the `sonoff` component from HA while doing a firmware update, due to auto-relogin function you might be kicked out of the app before the process is completed. I would not be held liable for any problems occuring if not following this steps!
+### WARNING: completely deactivate the `sonoff` component from HA while doing a firmware update, due to auto-relogin function you might be kicked out of the app before the process is completed. I would not be held liable for any problems occurring if not following this steps!
 ***
 
 **CHECK COMPATIBILITY LIST BELOW (not everyday updated)! 
@@ -55,7 +55,7 @@ steps and how it works:
 
 **NOTICE**: you should **NOT** leave debug-mode enabled for everyday use, please please just don't!
  
-This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (althought I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
+This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (although I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
 
 
 ## Compatibility list

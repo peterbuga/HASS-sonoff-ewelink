@@ -54,7 +54,7 @@ async def async_setup(hass, config):
 
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
 
-        for component in ['switch', 'sensor', 'fan']:
+        for component in ['switch', 'sensor', 'light', 'fan']:
             discovery.load_platform(hass, component, DOMAIN, {}, config)
 
         hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
@@ -297,22 +297,32 @@ class Sonoff():
             _LOGGER.error('websocket is not connected')
             return
 
-        _LOGGER.debug('received state event change from: %s' % event.data['deviceid'])
+        _LOGGER.debug('Received state event change for: %s' % event.data['deviceid'])
 
-        new_state = event.data['state']
+        params = event.data.get('params', None)
 
-        # convert from True/False to on/off
-        if isinstance(new_state, (bool)):
-            new_state = 'on' if new_state else 'off'
+        if params is None:
+            _LOGGER.error('improper event state sent')
+            return
+
+        # # convert from True/False to on/off
+        # if isinstance(new_state, (bool)):
+        #     new_state = 'on' if new_state else 'off'
 
         device = self.get_device(event.data['deviceid'])
-        outlet = event.data['outlet']
+        # outlet = event.data.get('outlet', None)
 
-        if outlet is not None:
+        if 'outlet' in params: # it's a multi switch capable device
+
             _LOGGER.debug("Switching `%s - %s` on outlet %d to state: %s", \
-                device['deviceid'], device['name'] , (outlet+1) , new_state)
+                device['deviceid'], device['name'] , (int(params['outlet']) + 1), params['switch'])
+
+            p = { 'switches' : device['params']['switches'] }
+            p['switches'][params['outlet']]['switch'] = params['switch']
+            params = p
+
         else:
-            _LOGGER.debug("Switching `%s` to state: %s", device['deviceid'], new_state)
+            _LOGGER.debug("Device `%s` change to: %s", device['deviceid'], json.dumps(params))
 
         if not device:
             _LOGGER.error('unknown device to be updated')
@@ -327,16 +337,6 @@ class Sonoff():
               apikey      = device apikey
               selfApiKey  = login apikey (yes, it's typed corectly selfApikey and not selfApiKey :|)
         """
-        if outlet is not None:
-            params = { 'switches' : device['params']['switches'] }
-            params['switches'][outlet]['switch'] = new_state
-
-            if 'switches' in event.data: # rest of the outlets for iFan
-                for oidx in event.data['switches']:
-                    params['switches'][oidx]['switch'] = event.data['switches'][oidx]
-
-        else:
-            params = { 'switch' : new_state }
 
         payload = {
             'action'        : 'update',
@@ -358,12 +358,12 @@ class Sonoff():
         # set also te pseudo-internal state of the device until the real refresh kicks in
         for idxd, dev in enumerate(self._devices):
             if dev['deviceid'] == device['deviceid']:
-                if outlet is not None:
-                    self._devices[idxd]['params']['switches'][outlet]['switch'] = new_state
+                if 'outlet' in params:
+                    self._devices[idxd]['params']['switches'][params['outlet']]['switch'] = params['switch']
                 else:
-                    self._devices[idxd]['params']['switch'] = new_state
+                    self._devices[idxd]['params'].update(params)
 
-        data = json.dumps({'entity_id' : str(device['deviceid']), 'outlet': outlet, 'new_state' : new_state})
+        data = json.dumps({'device_id' : str(device['deviceid']), 'params' : params})
         self.write_debug(data, type='S')
 
     def init_websocket(self):
@@ -384,19 +384,17 @@ class Sonoff():
         _LOGGER.debug('websocket msg: %s', data)
 
         data = json.loads(data)
-        if 'action' in data and data['action'] == 'update' and 'params' in data:
-            if 'switch' in data['params'] or 'switches' in data['params']:
-                for idx, device in enumerate(self._devices):
-                    if device['deviceid'] == data['deviceid']:
-                        self._devices[idx]['params'] = data['params']
+        if 'action' in data and data['action'] in ['update', 'sysmsg'] and 'params' in data:
+            for idx, device in enumerate(self._devices):
+                if device['deviceid'] == data['deviceid']:
 
-                        if 'switches' in data['params']:
-                            for switch in data['params']['switches']:
-                                self.set_entity_state(data['deviceid'], switch['switch'], switch['outlet'])
-                        else:
-                            self.set_entity_state(data['deviceid'], data['params']['switch'])
+                    # @TODO check for multiple outlets
+                    self._devices[idx]['params'].update(data['params'])
 
-                        break # do not remove
+                    self.set_entity_state(data['deviceid'], data['params'])
+
+                    break # do not remove
+
 
         self.write_debug(json.dumps(data), type='W')
 
@@ -413,19 +411,53 @@ class Sonoff():
 
         return grace_status
 
-    def set_entity_state(self, deviceid, state, outlet=None):
+    def get_device_type(self, deviceid): # switch, light, etc
+        device = self.get_device(deviceid)
+
+        if 'state' in device['params'] and 'switch' not in device['params']:
+            return 'light'
+        elif 'switch' in device['params'] or 'switches' in device['params']:
+            return 'switch'
+
+        return None # houston we have a problem here
+
+    def set_entity_state(self, deviceid, params):
         entity_id = 'switch.%s%s%s' % (
             'sonoff_' if self._entity_prefix else '',
             deviceid,
             '_'+str(outlet+1) if outlet is not None else ''
         )
+	# entity_id = '%s.%s%s' % (self.get_device_type(deviceid), 'sonoff_' if self._entity_prefix else '', deviceid)
 
-        # possible @PATCH when (i assume) the device is reported offline in HA but an update comes from websocket
-        if hasattr(self._hass.states.get(entity_id), 'attributes'):
-            attr = self._hass.states.get(entity_id).attributes
-            self._hass.states.set(entity_id, state, attr)
+        # @TODO update the availability
+        #if 'online' in params:
+        #    pass
 
-        data = json.dumps({'entity_id' : entity_id, 'outlet': outlet, 'state' : state})
+        if 'switches' in params:
+            for switch in params['switches']:
+                attr = {}
+                if hasattr(self._hass.states.get(entity_id), 'attributes'):
+                    attr = self._hass.states.get(entity_id).attributes
+
+                self._hass.states.set(entity_id, switch['switch'], attr)
+        else:
+            entity = self._hass.states.get(entity_id)
+
+            if hasattr(entity, 'attributes') and hasattr(entity, 'state'):
+                attr = entity.attributes
+                state = entity.state
+
+                if 'switch' in params:
+                    state = params['switch']
+
+                elif 'state' in params: # light sonoff b1
+                    # @TODO calculate color/color_temp and maybe brightness
+
+                    state = params['state']
+
+                self._hass.states.set(entity_id, state, attr)
+
+        data = json.dumps({'device_id' : deviceid, 'params': params})
         self.write_debug(data, type='s')
 
     def update_devices(self):
@@ -441,8 +473,6 @@ class Sonoff():
         r = requests.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1&version=6&ts=%s&nonce=%s&appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq&imei=%s&os=iOS&model=%s&romVersion=%s&appVersion=%s'.format(
             self._api_region, self.get_user_apikey(), str(int(time.time())), ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8)), self._imei, self._model, self._romVersion, self._appVersion
             ), headers=self._headers)
-
-        # _LOGGER.error(r.text)
 
         resp = r.json()
         if 'error' in resp and resp['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED]:
@@ -526,7 +556,6 @@ class Sonoff():
 
     def device_type_by_uiid(self, device):
         return self.uiid_to_name.get(device['uiid'], None)
-
     ### sonog_debug.log section ###
     def write_debug(self, data, type = '', new = False):
 
@@ -695,7 +724,11 @@ class SonoffDevice(Entity):
             return device['params']['switches'][self._outlet]['switch'] == 'on' if device else False
 
         else:
-            return device['params']['switch'] == 'on' if device else False
+            # `state` for B1
+            # `switch` for everything else
+
+            state_key = 'state' if 'state' in device['params'] and not 'switch' in device['params'] else 'switch'
+            return device['params'][state_key] == 'on' if device else False
 
     def get_available(self):
         device = self.get_device()
@@ -724,6 +757,17 @@ class SonoffDevice(Entity):
         # we don't update here because there's 1 single thread that can be active at anytime
         # and the websocket will send the state update messages
         pass
+
+    @property
+    def device_info(self):
+        """Return the device info."""
+
+        device = self.get_device()
+
+        return {
+            'model' : device['productModel'],
+            'mac'   : device['params']['staMac']
+        }
 
 
     @property
