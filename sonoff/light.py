@@ -42,11 +42,11 @@ class SonoffLight(SonoffDevice, LightDevice):
 
         self._name   = device['name']
         self._state  = self.get_state()
-        
+
         self._ch01          = [int(device['params']['channel0']), int(device['params']['channel1'])]
         self._ch234         = [int(device['params']['channel2']), int(device['params']['channel3']), int(device['params']['channel4'])]
 
-        # calculate the mode 
+        # calculate the mode
         if int(device['params']['channel0']) > 0 or int(device['params']['channel1']) > 0:
             self._mode          = EFFECT_WARMCOOL
             self._hs_color      = [0, 0]
@@ -65,7 +65,7 @@ class SonoffLight(SonoffDevice, LightDevice):
             self._color_temp    = 325 # fallback
 
         # full brightness all the time till i figure a way to calculate it
-        self._brightness    = 255 
+        self._brightness    = 255
 
     @property
     def name(self):
@@ -176,7 +176,7 @@ class SonoffLight(SonoffDevice, LightDevice):
                 ch1 = 255
 
             else:
-                if kwargs['color_temp'] <= 322: 
+                if kwargs['color_temp'] <= 322:
                     color_temp = kwargs['color_temp'] - 153 # default min color temp val
 
                     ch0 = int(((173 - color_temp) * 255) / 173)
@@ -207,7 +207,7 @@ class SonoffLight(SonoffDevice, LightDevice):
 
             self._hs_color = kwargs['hs_color']
             rgb = color.color_hs_to_RGB(*kwargs['hs_color'])
-            
+
             # apply brightness
             rgb = [int(x * self._brightness / 255) for x in rgb]
 
@@ -251,7 +251,7 @@ class SonoffLight(SonoffDevice, LightDevice):
             entity_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid)
         else:
             entity_id = "{}.{}".format(DOMAIN, self._deviceid)
-        
+
         return entity_id
 
     @property

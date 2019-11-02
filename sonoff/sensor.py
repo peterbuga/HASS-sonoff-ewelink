@@ -5,26 +5,11 @@ from homeassistant.util import Throttle
 from homeassistant.components.sensor import DOMAIN
 # from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
-from homeassistant.const import TEMP_CELSIUS
+from custom_components.sonoff import SONOFF_SENSORS_MAP
 
-SCAN_INTERVAL = timedelta(seconds=10)
+SCAN_INTERVAL = timedelta(seconds=15)
 
 _LOGGER = logging.getLogger(__name__)
-
-SONOFF_SENSORS_MAP = {
-    'power'                 : { 'eid' : 'power',        'uom' : 'W',            'icon' : 'mdi:flash-outline' },
-    'current'               : { 'eid' : 'current',      'uom' : 'A',            'icon' : 'mdi:current-ac' },
-    'voltage'               : { 'eid' : 'voltage',      'uom' : 'V',            'icon' : 'mdi:power-plug' },
-    'dusty'                 : { 'eid' : 'dusty',        'uom' : 'µg/m3',        'icon' : 'mdi:select-inverse' },
-    'light'                 : { 'eid' : 'light',        'uom' : 'lx',           'icon' : 'mdi:car-parking-lights' },
-    'noise'                 : { 'eid' : 'noise',        'uom' : 'Db',           'icon' : 'mdi:surround-sound' },
-
-    'currentHumidity'       : { 'eid' : 'humidity',     'uom' : '%',            'icon' : 'mdi:water-percent' },
-    'humidity'              : { 'eid' : 'humidity',     'uom' : '%',            'icon' : 'mdi:water-percent' },
-
-    'currentTemperature'    : { 'eid' : 'temperature',  'uom' : TEMP_CELSIUS,   'icon' : 'mdi:thermometer' },
-    'temperature'           : { 'eid' : 'temperature',  'uom' : TEMP_CELSIUS,   'icon' : 'mdi:thermometer' }
-}
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Add the Sonoff Sensor entities"""
@@ -52,6 +37,7 @@ class SonoffSensor(SonoffDevice):
         self._sensor        = sensor
         self._name          = '{} {}'.format(device['name'], SONOFF_SENSORS_MAP[self._sensor]['eid'])
         self._attributes    = {}
+        self._state         = None
 
     @property
     def unit_of_measurement(self):
@@ -60,8 +46,14 @@ class SonoffSensor(SonoffDevice):
 
     @property
     def state(self):
-       """Return the state of the sensor."""
-       return self.get_device()['params'].get(self._sensor)
+        """Return the state of the sensor."""
+        state = self.get_device()['params'].get(self._sensor, None)
+
+        # they should also get updated via websocket
+        if state is not None and state != "unavailable":
+            self._state = state
+
+        return self._state
 
     # entity id is required if the name use other characters not in ascii
     @property

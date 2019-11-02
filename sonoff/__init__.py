@@ -7,14 +7,15 @@ from datetime import timedelta
 from datetime import datetime
 
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers import discovery
-from homeassistant.helpers import config_validation as cv
+from homeassistant.util import dt as dt_util
+from homeassistant.helpers.event import (async_track_time_interval, track_point_in_time)
+from homeassistant.helpers import (config_validation as cv, discovery)
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_SCAN_INTERVAL,
     CONF_EMAIL, CONF_PASSWORD, CONF_USERNAME,
     HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST,
     HTTP_UNAUTHORIZED, HTTP_NOT_FOUND)
+from homeassistant.const import TEMP_CELSIUS
 
 CONF_API_REGION     = 'api_region'
 CONF_GRACE_PERIOD   = 'grace_period'
@@ -22,6 +23,21 @@ CONF_DEBUG          = 'debug'
 CONF_ENTITY_PREFIX  = 'entity_prefix'
 
 DOMAIN              = "sonoff"
+
+SONOFF_SENSORS_MAP = {
+    'power'                 : { 'eid' : 'power',        'uom' : 'W',            'icon' : 'mdi:flash-outline' },
+    'current'               : { 'eid' : 'current',      'uom' : 'A',            'icon' : 'mdi:current-ac' },
+    'voltage'               : { 'eid' : 'voltage',      'uom' : 'V',            'icon' : 'mdi:power-plug' },
+    'dusty'                 : { 'eid' : 'dusty',        'uom' : 'µg/m3',        'icon' : 'mdi:select-inverse' },
+    'light'                 : { 'eid' : 'light',        'uom' : 'lx',           'icon' : 'mdi:car-parking-lights' },
+    'noise'                 : { 'eid' : 'noise',        'uom' : 'Db',           'icon' : 'mdi:surround-sound' },
+
+    'currentHumidity'       : { 'eid' : 'humidity',     'uom' : '%',            'icon' : 'mdi:water-percent' },
+    'humidity'              : { 'eid' : 'humidity',     'uom' : '%',            'icon' : 'mdi:water-percent' },
+
+    'currentTemperature'    : { 'eid' : 'temperature',  'uom' : TEMP_CELSIUS,   'icon' : 'mdi:thermometer' },
+    'temperature'           : { 'eid' : 'temperature',  'uom' : TEMP_CELSIUS,   'icon' : 'mdi:thermometer' }
+}
 
 REQUIREMENTS        = ['uuid', 'websocket-client==0.54.0']
 
@@ -37,7 +53,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Required(CONF_PASSWORD): cv.string,
 
         vol.Optional(CONF_API_REGION, default='eu'): cv.string,
-        vol.Optional(CONF_SCAN_INTERVAL, default=timedelta(seconds=30)): cv.time_period,
+        vol.Optional(CONF_SCAN_INTERVAL, default=timedelta(seconds=60)): cv.time_period,
         vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
         vol.Optional(CONF_ENTITY_PREFIX, default=True): cv.boolean,
 
@@ -54,7 +70,7 @@ async def async_setup(hass, config):
 
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
 
-        for component in ['switch', 'sensor', 'light', 'fan']:
+        for component in ['switch', 'sensor', 'binary_sensor', 'light', 'fan']:
             discovery.load_platform(hass, component, DOMAIN, {}, config)
 
         hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
@@ -96,9 +112,12 @@ class Sonoff():
         self._ws            = None
         self._wshost        = None
 
+        self._login_cnt     = 0
+
         self.write_debug('{}', new=True)
         self.do_login()
 
+        self.rf2trig       = {} # dict to hold the mapping of rf triggers IDs to their websocket value response
         # lazy to store this in another place for now...
         self.uiid_to_name = {
             1       : "SOCKET",
@@ -237,8 +256,21 @@ class Sonoff():
             'Content-Type'  : 'application/json;charset=UTF-8'
         }
 
-        r = requests.post('https://{}-api.coolkit.cc:8080/api/user/login'.format(self._api_region),
-            headers=self._headers, json=app_details)
+        if self._login_cnt > 4:
+            _LOGGER.error("FAILED TO LOGIN AFTER 5 ATTEMPTS!")
+            return
+
+        try:
+            r = requests.post('https://{}-api.coolkit.cc:8080/api/user/login'.format(self._api_region),
+                headers=self._headers, json=app_details, timeout=30)
+            self._login_cnt = 0
+
+        except:
+            _LOGGER.warning("Login failed! retrying...", self._api_region)
+            self._login_cnt += 1
+            time.sleep(10)
+            self.do_login()
+            return
 
         resp = r.json()
 
@@ -388,9 +420,7 @@ class Sonoff():
             for idx, device in enumerate(self._devices):
                 if device['deviceid'] == data['deviceid']:
 
-                    # @TODO check for multiple outlets
                     self._devices[idx]['params'].update(data['params'])
-
                     self.set_entity_state(data['deviceid'], data['params'])
 
                     break # do not remove
@@ -411,54 +441,156 @@ class Sonoff():
 
         return grace_status
 
-    def get_device_type(self, deviceid): # switch, light, etc
+    # TBH this starts to look like ewelink app spaghetti code :(
+    def get_device_entity_types(self, deviceid, params): # switch, light, etc
+        entity_types = []
         device = self.get_device(deviceid)
 
-        if 'state' in device['params'] and 'switch' not in device['params']:
-            return 'light'
-        elif 'switch' in device['params'] or 'switches' in device['params']:
-            return 'switch'
+        if 'FAN' in self.device_type_by_uiid(device):
+            entity_types.append({'domain': 'fan',   'type': None})
+            entity_types.append({'domain': 'light', 'type': None})
 
-        return None # houston we have a problem here
+        elif 'state' in device['params'] and 'switch' not in device['params']:
+            entity_types.append({'domain': 'light', 'type': None}) # sonoff b1
+
+        elif self.uiid_to_name[device['uiid']] == 'RF_BRIDGE':
+            entity_types.append({'domain': 'binary_sensor', 'type': None})
+
+        elif 'switch' in device['params'] or 'switches' in device['params']:
+            entity_types.append({'domain': 'switch', 'type': None})
+
+            # add sensors list
+            for sensor_type in SONOFF_SENSORS_MAP.keys():
+                if sensor_type in params.keys():
+                    entity_types.append({
+                        'domain': 'sensor',
+                        'type'  : SONOFF_SENSORS_MAP[sensor_type]['eid'],
+                        'key'   : sensor_type
+                    })
+
+        # elif 'switches' in device['params']:
+        #     entity_types.append({'domain': 'switch', 'type': None})
+
+        return entity_types
 
     def set_entity_state(self, deviceid, params):
-        entity_id = 'switch.%s%s%s' % (
-            'sonoff_' if self._entity_prefix else '',
-            deviceid,
-            '_'+str(outlet+1) if outlet is not None else ''
-        )
-	# entity_id = '%s.%s%s' % (self.get_device_type(deviceid), 'sonoff_' if self._entity_prefix else '', deviceid)
+        entities = []
+
+        device_entity_types = self.get_device_entity_types(deviceid, params)
+        for entity_type in device_entity_types:
+            if 'switches' in params:
+
+                # stupid itead serialization
+                if 'FAN' in self.device_type_by_uiid(self.get_device(deviceid)):
+                    entity_id = "{}.{}_{}".format(
+                        entity_type['domain'],
+                        DOMAIN if self._entity_prefix else '',
+                        deviceid
+                    )
+
+                    entities.append({"entity" : entity_id, "type": None })
+
+                else: # 4-3-2 gang switch
+                    for idx, switch in enumerate(params['switches']):
+                        entity_id = "{}.{}_{}_{}".format(
+                            entity_type['domain'],
+                            DOMAIN if self._entity_prefix else '',
+                            deviceid,
+                            str(idx+1)
+                        )
+
+                        entities.append({"entity" : entity_id, "type": None })
+            else:
+                entity_id = "{}.{}_{}{}".format(
+                    entity_type['domain'],
+                    DOMAIN if self._entity_prefix else '',
+                    deviceid if 'cmd' not in params.keys() else self.rf2trig[list(params.keys())[-1]], # for rf bridge use trigger ID
+                    '_' + entity_type['type'] if entity_type['type'] is not None else ''
+                )
+
+                entities.append({
+                    "entity_id" : entity_id,
+                    "type"      : entity_type['type'],
+                    "key"       : entity_type['key'] if 'key' in entity_type else None
+                })
 
         # @TODO update the availability
-        #if 'online' in params:
+        # if 'online' in params:
         #    pass
 
-        if 'switches' in params:
-            for switch in params['switches']:
-                attr = {}
-                if hasattr(self._hass.states.get(entity_id), 'attributes'):
-                    attr = self._hass.states.get(entity_id).attributes
+        for ent in entities:
+            entity = self._hass.states.get(ent['entity_id'])
 
-                self._hass.states.set(entity_id, switch['switch'], attr)
-        else:
-            entity = self._hass.states.get(entity_id)
+            # ugly fix to overcome the 2-3 gang switches
+            # should be on-par with the generation part in switch.py
+            if not entity:
+                continue
 
+            # @INFO it happens that sometimes these values are missing
             if hasattr(entity, 'attributes') and hasattr(entity, 'state'):
-                attr = entity.attributes
-                state = entity.state
+                if 'switches' in params:
+                    if 'FAN' in self.device_type_by_uiid(self.get_device(deviceid)):
+                        # @TODO calculate fan state + light on/off
+                        pass
 
-                if 'switch' in params:
-                    state = params['switch']
+                    else:
+                        for switch in params['switches']:
+                            attr = {}
+                            if hasattr(self._hass.states.get(entity_id), 'attributes'):
+                                attr = self._hass.states.get(entity_id).attributes
 
-                elif 'state' in params: # light sonoff b1
-                    # @TODO calculate color/color_temp and maybe brightness
+                            self._hass.states.set(entity_id, switch['switch'], attr)
+                else:
+                    state = entity.state
+                    attr  = entity.attributes
 
-                    state = params['state']
+                    if ent['type'] is not None: # it's a sensor entity
+                        state = params[ent['key']]
 
-                self._hass.states.set(entity_id, state, attr)
+                    else:
+                        # update the attributes of the "parent" entities
+
+                        # @TODO learn how to update attrinutes class
+                        # until then they'll be updated via poll refresh of entity
+
+                        # for at in ['rssi', 'voltage', 'current', 'power',
+                        #     'temperature', 'currentTemperature',
+                        #     'humidity', 'currentHumidity']:
+                        #     if at in params.keys():
+                        #         setattr(attr, at, params[at])
+
+                        if 'switch' in params:
+                            state = params['switch']
+
+                        elif 'state' in params: # light sonoff b1
+                            # @TODO calculate color/color_temp and maybe brightness
+                            state = params['state']
+
+                        elif 'cmd' in params: # it's an RF trigger
+                            # reset the binary sensor
+                            track_point_in_time(
+                                  self._hass,
+                                  self.reset_binary_sensors,
+                                  dt_util.utcnow() + timedelta(seconds=2)
+                            )
+
+                            state = 'on'
+
+                    _LOGGER.debug('updating: {} {}'.format(ent['entity_id'], state))
+
+                    self._hass.states.set(ent['entity_id'], state, attr)
 
         data = json.dumps({'device_id' : deviceid, 'params': params})
         self.write_debug(data, type='s')
+
+    # @TODO @FIX too ugly!!!!!
+    def reset_binary_sensors(self, now=None):
+        for device in self.get_devices():
+            if self.uiid_to_name[device['uiid']] == 'RF_BRIDGE':
+                for rf in device['params']['rfList']:
+                    entity = self._hass.states.get('binary_sensor.sonoff_'+rf['rfVal'].lower())
+                    attr  = entity.attributes
+                    self._hass.states.set('binary_sensor.sonoff_'+rf['rfVal'].lower(), 'off', attr)
 
     def update_devices(self):
         if self.get_user_apikey() is None:
@@ -607,7 +739,7 @@ class Sonoff():
         data = re.sub(r'"phoneNumber": ".*"', '"phoneNumber": "[hidden]",', data)
         # data = re.sub(r'"name": ".*"', '"name": "[hidden]",', data)
         data = re.sub(r'"ip": ".*",', '"ip": "[hidden]",', data)
-        #data = re.sub(r'"deviceid": ".*",', '"deviceid": "[hidden]",', data)
+        # data = re.sub(r'"deviceid": ".*",', '"deviceid": "[hidden]",', data)
         # data = re.sub(r'"_id": ".*",', '"_id": "[hidden]",', data)
         data = re.sub(r'"\w{2}:\w{2}:\w{2}:\w{2}:\w{2}:\w{2}"', '"xx:xx:xx:xx:xx:xx"', data)
         data = re.sub(r'"\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"', '"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"', data)

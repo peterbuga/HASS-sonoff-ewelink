@@ -1,6 +1,5 @@
 import logging, time, json
 
-# from homeassistant.components.fan import FanEntity
 from homeassistant.components.fan import (SUPPORT_SET_SPEED,
     SPEED_OFF, SPEED_LOW, SPEED_MEDIUM, SPEED_HIGH,
     ATTR_SPEED, ATTR_SPEED_LIST, FanEntity)
@@ -46,9 +45,8 @@ class SonoffFan(SonoffDevice, FanEntity):
         self.set_speed(speed)
 
         data = {
-            'state'     : True,
             'deviceid'  : self._deviceid,
-            'outlet'    : 1
+            'params'    : {'switches' : { 1: 'on'}}
         }
 
         switches = {'switches' : {}}
@@ -59,7 +57,7 @@ class SonoffFan(SonoffDevice, FanEntity):
         elif speed == SPEED_HIGH: # ON intention
             switches = {'switches' : { 2 : 'off', 3 : 'on' }}
 
-        data.update(switches)
+        data['params'].update(switches)
 
         self._hass.bus.async_fire('sonoff_state', data)
         self.async_schedule_update_ha_state()
@@ -67,10 +65,10 @@ class SonoffFan(SonoffDevice, FanEntity):
     def turn_off(self, **kwargs):
         """Turn the device off."""
         self._hass.bus.async_fire('sonoff_state', {
-            'state'     : False,
             'deviceid'  : self._deviceid,
-            'outlet'    : 1
+            'params'    : {'switches' : { 1: 'off'}}
         })
+
         self.async_schedule_update_ha_state()
 
     # entity id is required if the name use other characters not in ascii
