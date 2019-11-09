@@ -17,6 +17,8 @@ from homeassistant.const import (
     HTTP_UNAUTHORIZED, HTTP_NOT_FOUND)
 from homeassistant.const import TEMP_CELSIUS
 
+HTTP_NOT_ACCEPTED   = 406
+
 CONF_API_REGION     = 'api_region'
 CONF_GRACE_PERIOD   = 'grace_period'
 CONF_DEBUG          = 'debug'
@@ -607,7 +609,8 @@ class Sonoff():
             ), headers=self._headers)
 
         resp = r.json()
-        if 'error' in resp and resp['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED]:
+
+        if 'error' in resp and resp['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED, HTTP_NOT_ACCEPTED]:
             # @IMPROVE add maybe a service call / switch to deactivate sonoff component
             if self.is_grace_period():
                 _LOGGER.warning("Grace period activated!")
