@@ -1,0 +1,7 @@
+{
+  "name": "Sonoff eWelink",
+  "render_readme": true,
+  "domains": ["sensor", "switch"],
+  "iot_class": "cloud_push",
+  "homeassistant": "0.96.0"
+}
