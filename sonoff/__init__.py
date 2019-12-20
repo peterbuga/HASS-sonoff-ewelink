@@ -768,11 +768,12 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
         self.last_update = time.time()
 
         payload = {
-            'action'    : "userOnline",
+            'appid'     : 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq',
+            'action'    : 'userOnline',
             'userAgent' : 'app',
             'version'   : 6,
             'nonce'     : ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8)),
-            'apkVersion': "1.8",
+            'apkVersion': '1.8',
             'os'        : 'iOS',
             'at'        : self._sonoff.get_bearer_token(),
             'apikey'    : self._sonoff.get_user_apikey(),
