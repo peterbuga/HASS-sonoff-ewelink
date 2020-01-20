@@ -42,6 +42,9 @@ And copy the *.py files in `custom_components` folder using the same structure l
 
 `entity_prefix` this option removes the `sonoff_` prefix from entities name (it's more or a less a compatibility mode between previous `master` vs `websocket` branch implementations)
 
+### Video How-To
+Step-by-step guide - https://youtu.be/DbBqa-rq31g
+
 ### debug log generation / new device / new features requests
 `debug` if enabled this will give you the ability to generate a log of messages from ewelink that can be easily posted here to debug/implement new devices. 
 
