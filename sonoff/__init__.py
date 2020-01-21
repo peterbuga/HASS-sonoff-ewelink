@@ -1,4 +1,5 @@
 # The domain of your component. Should be equal to the name of your component.
+### Check https://github.com/peterbuga/HASS-sonoff-ewelink for updates ###
 import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading, hashlib, string
 import voluptuous as vol
 import asyncio
@@ -596,6 +597,7 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
         self.last_update = time.time()
 
         payload = {
+            'appid'     : 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq',
             'action'    : "userOnline",
             'userAgent' : 'app',
             'version'   : 6,
