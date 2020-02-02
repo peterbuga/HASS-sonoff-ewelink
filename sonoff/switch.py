@@ -9,7 +9,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Add the Sonoff Switch entities"""
- 
+
     entities = []
     for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = True):
         outlets_number = hass.data[SONOFF_DOMAIN].get_outlets(device)
@@ -28,15 +28,15 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             for outlet in range(0, outlets_number):
                 entity = SonoffSwitch(hass, device, outlet)
                 entities.append(entity)
-	
+
         # normal device = Sonoff Basic (and alike)
-        elif 'switch' in device['params'] or 'state' in device['params']: #ignore devices like Sonoff RF bridge: 
+        elif 'switch' in device['params'] or 'state' in device['params']: #ignore devices like Sonoff RF bridge:
             entity = SonoffSwitch(hass, device)
             entities.append(entity)
 
     if hass.data[SONOFF_DOMAIN].get_debug_state():
         debug_entity = SonoffDebugSwitch(hass)
-        entities.append(debug_entity)        
+        entities.append(debug_entity)
 
     if len(entities):
         async_add_entities(entities, update_before_add=False)
@@ -105,7 +105,7 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
 
         if self._outlet is not None:
             entity_id = "{}_{}".format(entity_id, str(self._outlet+1))
-        
+
         return entity_id
 
 class SonoffDebugSwitch(SwitchDevice):
