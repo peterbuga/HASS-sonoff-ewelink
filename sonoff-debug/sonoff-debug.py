@@ -28,10 +28,12 @@ def gen_nonce(length=8):
 
 headers = {'Content-Type'  : 'application/json'}
 user_details = {}
+app_details = {}   # to pass details from login to get_devices
 api_region='us'
 
 def do_login():
 	global api_region
+	global app_details
 
 	
 	app_details = {
@@ -77,10 +79,16 @@ def do_login():
 		user_details = r.json()
 
 def get_devices():
+	global app_details
+
 	headers.update({'Authorization' : 'Bearer ' + user_details['at']})
-	r = requests.get('https://%s-api.coolkit.cc:8080/api/user/device?lang=en&apiKey=%s&getTags=1' % \
-		(api_region, user_details['user']['apikey']), 
-		headers=headers)
+	r = requests.get(
+		'https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1&version=6&ts=%s&nonce=%s&appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq&imei=%s&os=iOS&model=%s&romVersion=%s&appVersion=%s'.format(
+			api_region, user_details['user']['apikey'], str(int(time.time())),
+			gen_nonce(15), app_details['imei'],
+			app_details['model'],
+			app_details['romVersion'], app_details['appVersion']
+		), headers=headers)
 	devices = r.json()
 
 	return json.dumps(devices, indent=2, sort_keys=True)
