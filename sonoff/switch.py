@@ -75,23 +75,22 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
         self._state = self.get_state()
         return self._state
 
-    def turn_on(self, **kwargs):
+    def change_state(self, new_state, **kwargs):
         """Turn the device on."""
         self._hass.bus.async_fire('sonoff_state', {
-            'state'     : True,
+            'state'     : new_state,
             'deviceid'  : self._deviceid,
             'outlet'    : self._outlet
         })
         self.async_schedule_update_ha_state()
 
+    def turn_on(self, **kwargs):
+        """Turn the device on."""
+        self.change_state(True, **kwargs)
+
     def turn_off(self, **kwargs):
         """Turn the device off."""
-        self._hass.bus.async_fire('sonoff_state', {
-            'state'     : False,
-            'deviceid'  : self._deviceid,
-            'outlet'    : self._outlet
-        })
-        self.async_schedule_update_ha_state()
+        self.change_state(False, **kwargs)
 
     # entity id is required if the name use other characters not in ascii
     @property
