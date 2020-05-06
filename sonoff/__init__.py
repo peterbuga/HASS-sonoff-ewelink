@@ -2,6 +2,7 @@
 import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading, hashlib, string
 import voluptuous as vol
 import asyncio
+import aiohttp
 
 from datetime import timedelta
 from datetime import datetime
@@ -55,7 +56,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Required(CONF_PASSWORD): cv.string,
 
         vol.Optional(CONF_API_REGION, default='eu'): cv.string,
-        vol.Optional(CONF_SCAN_INTERVAL, default=timedelta(seconds=60)): cv.time_period,
+        vol.Optional(CONF_SCAN_INTERVAL, default=timedelta(seconds=600)): cv.time_period,
         vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
         vol.Optional(CONF_ENTITY_PREFIX, default=True): cv.boolean,
 
@@ -70,20 +71,22 @@ async def async_setup(hass, config):
 
     hass.data[DOMAIN] = Sonoff(hass, config)
 
+    await hass.data[DOMAIN].do_login()
+
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
 
         for component in ['switch', 'sensor', 'binary_sensor', 'light', 'fan']:
-            discovery.load_platform(hass, component, DOMAIN, {}, config)
+            await discovery.async_load_platform(hass, component, DOMAIN, {}, config)
 
         hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
 
         # close the websocket when HA stops
         # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
 
-        def update_devices(event_time):
+        async def update_devices(event_time):
             asyncio.run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
 
-        async_track_time_interval(hass, update_devices, hass.data[DOMAIN].get_scan_interval())
+        async_track_time_interval(hass, update_devices, await hass.data[DOMAIN].get_scan_interval())
 
     return True
 
@@ -117,7 +120,6 @@ class Sonoff():
         self._login_cnt     = 0
 
         self.write_debug('{}', new=True)
-        self.do_login()
 
         self.rf2trig       = {} # dict to hold the mapping of rf triggers IDs to their websocket value response
         # lazy to store this in another place for now...
@@ -185,12 +187,12 @@ class Sonoff():
             1256    : "ZIGBEE_LIGHT"
         }
 
-    def get_scan_interval(self):
+    async def get_scan_interval(self):
         if DOMAIN in self._hass.data and self._hass.data[DOMAIN].get_debug_state():
             self._scan_interval = timedelta(seconds=10)
 
-        elif self._scan_interval < timedelta(seconds=60):
-            self._scan_interval = timedelta(seconds=60)
+        elif self._scan_interval < timedelta(seconds=600):
+            self._scan_interval = timedelta(seconds=600)
 
         return self._scan_interval
 
@@ -202,7 +204,7 @@ class Sonoff():
         # a quick fix between (i-blame-myself) `master` vs. `websocket` implementations
         return self._entity_prefix
 
-    def do_login(self):
+    async def do_login(self):
 
         import uuid
 
@@ -259,72 +261,75 @@ class Sonoff():
         }
 
         if self._login_cnt > 4:
-            _LOGGER.error("FAILED TO LOGIN AFTER 5 ATTEMPTS!")
+            _LOGGER.error("SONOFF COMPONENT FAILED TO LOGIN AFTER 5 ATTEMPTS!")
             return
 
         try:
-            r = requests.post('https://{}-api.coolkit.cc:8080/api/user/login'.format(self._api_region),
-                headers=self._headers, json=app_details, timeout=30)
-            self._login_cnt = 0
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    'https://{}-api.coolkit.cc:8080/api/user/login'.format(self._api_region),
+                    headers=self._headers, json=app_details, timeout=30) as r:
+                    resp = await r.json()
 
         except:
-            _LOGGER.warning("Login failed! retrying...", self._api_region)
+            _LOGGER.warning("Login failed! retrying... %s", self._api_region)
             self._login_cnt += 1
-            time.sleep(10)
-            self.do_login()
+            time.sleep(5)
+            await self.do_login()
             return
 
-        resp = r.json()
+        else:
+            # get a new region to login
+            if 'error' in resp and 'region' in resp and resp['error'] == HTTP_MOVED_PERMANENTLY:
+                self._api_region    = resp['region']
+                self._wshost        = None
 
-        # get a new region to login
-        if 'error' in resp and 'region' in resp and resp['error'] == HTTP_MOVED_PERMANENTLY:
-            self._api_region    = resp['region']
-            self._wshost        = None
+                _LOGGER.warning("found new region: >>> %s <<< (you should change api_region option to this value in configuration.yaml)", self._api_region)
 
-            _LOGGER.warning("found new region: >>> %s <<< (you should change api_region option to this value in configuration.yaml)", self._api_region)
+                # re-login using the new localized endpoint
+                await self.do_login()
 
-            # re-login using the new localized endpoint
-            self.do_login()
+            elif 'error' in resp and resp['error'] in [HTTP_NOT_FOUND, HTTP_BAD_REQUEST]:
+                # (most likely) login with +86... phone number and region != cn
+                if '@' not in self._username and self._api_region in ['eu', 'us']:
+                    # self._api_region = 'cn'
+                    # self.do_login()
+                    _LOGGER.error('Login failed! try to change the api_region to \'cn\' OR \'as\'')
 
-        elif 'error' in resp and resp['error'] in [HTTP_NOT_FOUND, HTTP_BAD_REQUEST]:
-            # (most likely) login with +86... phone number and region != cn
-            if '@' not in self._username and self._api_region in ['eu', 'us']:
-                # self._api_region = 'cn'
-                # self.do_login()
-                _LOGGER.error('Login failed! try to change the api_region to \'cn\' OR \'as\'')
+                else:
+                    _LOGGER.error("Couldn't authenticate using the provided credentials!")
 
             else:
-                _LOGGER.error("Couldn't authenticate using the provided credentials!")
 
-        else:
-            if 'at' not in resp:
-                _LOGGER.error('Login failed! Please check credentials!')
-                return
+                if 'at' not in resp:
+                    _LOGGER.error('Login failed! Please check credentials!')
+                    return
 
-            self._bearer_token  = resp['at']
-            self._user_apikey   = resp['user']['apikey']
-            self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
+                self._bearer_token  = resp['at']
+                self._user_apikey   = resp['user']['apikey']
+                self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
 
-            self.update_devices() # to write the devices list
+                await self.update_devices() # to write the devices list
 
-            # get/find the websocket host
-            if not self._wshost:
-                self.set_wshost()
+                # get/find the websocket host
+                if not self._wshost:
+                    await self.set_wshost()
 
-            if self.get_wshost() is not None:
-                self.thread = threading.Thread(target=self.init_websocket)
-                self.thread.daemon = True
-                self.thread.start()
+                if self.get_wshost() is not None:
+                    self.thread = threading.Thread(target=self.init_websocket)
+                    self.thread.daemon = True
+                    self.thread.start()
 
-    def set_wshost(self):
-        r = requests.post('https://%s-disp.coolkit.cc:8080/dispatch/app' % self._api_region, headers=self._headers)
-        resp = r.json()
+    async def set_wshost(self):
+        async with aiohttp.ClientSession() as session:
+            async with session.post('https://%s-disp.coolkit.cc:8080/dispatch/app' % self._api_region, headers=self._headers) as r:
+                resp = await r.json()
 
-        if 'error' in resp and resp['error'] == 0 and 'domain' in resp:
-            self._wshost = resp['domain']
-            _LOGGER.info("Found websocket address: %s", self._wshost)
-        else:
-            _LOGGER.error("Couldn't find a valid websocket host, abording Sonoff init")
+                if 'error' in resp and resp['error'] == 0 and 'domain' in resp:
+                    self._wshost = resp['domain']
+                    _LOGGER.info("Found websocket address: %s", self._wshost)
+                else:
+                    _LOGGER.error("Couldn't find a valid websocket host, abording Sonoff init")
 
     async def state_listener(self, event):
         if not self.get_ws().connected:
@@ -397,8 +402,8 @@ class Sonoff():
                 else:
                     self._devices[idxd]['params'].update(params)
 
-        data = json.dumps({'device_id' : str(device['deviceid']), 'params' : params})
-        self.write_debug(data, type='S')
+        # data = json.dumps({'device_id' : str(device['deviceid']), 'params' : params})
+        # self.write_debug(data, type='S')
 
     def init_websocket(self):
         # keep websocket open indefinitely
@@ -428,7 +433,7 @@ class Sonoff():
                     break # do not remove
 
 
-        self.write_debug(json.dumps(data), type='W')
+        # self.write_debug(json.dumps(data), type='W')
 
     def on_error(self, *args):
         error = args[-1] # to accomodate the case when the function receives 2 or 3 args
@@ -582,8 +587,8 @@ class Sonoff():
 
                     self._hass.states.set(ent['entity_id'], state, attr)
 
-        data = json.dumps({'device_id' : deviceid, 'params': params})
-        self.write_debug(data, type='s')
+        # data = json.dumps({'device_id' : deviceid, 'params': params})
+        # self.write_debug(data, type='s')
 
     # @TODO @FIX too ugly!!!!!
     def reset_binary_sensors(self, now=None):
@@ -594,7 +599,7 @@ class Sonoff():
                     attr  = entity.attributes
                     self._hass.states.set('binary_sensor.sonoff_'+rf['rfVal'].lower(), 'off', attr)
 
-    def update_devices(self):
+    async def update_devices(self):
         if self.get_user_apikey() is None:
             _LOGGER.error("Initial login failed, devices cannot be updated!")
             return self._devices
@@ -604,11 +609,11 @@ class Sonoff():
             _LOGGER.info("Grace period active")
             return self._devices
 
-        r = requests.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1&version=6&ts=%s&nonce=%s&appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq&imei=%s&os=iOS&model=%s&romVersion=%s&appVersion=%s'.format(
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1&version=6&ts=%s&nonce=%s&appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq&imei=%s&os=iOS&model=%s&romVersion=%s&appVersion=%s'.format(
             self._api_region, self.get_user_apikey(), str(int(time.time())), ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8)), self._imei, self._model, self._romVersion, self._appVersion
-            ), headers=self._headers)
-
-        resp = r.json()
+            ), headers=self._headers) as r:
+                resp = await r.json()
 
         if 'error' in resp and resp['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED, HTTP_NOT_ACCEPTED]:
             # @IMPROVE add maybe a service call / switch to deactivate sonoff component
@@ -620,17 +625,16 @@ class Sonoff():
                 return self._devices
 
             _LOGGER.info("Re-login component")
-            self.do_login()
+            await self.do_login()
 
-        self._devices = r.json()['devicelist'] if 'devicelist' in r.json() else r.json()
+        self._devices = resp['devicelist'] if 'devicelist' in resp else resp
 
-        self.write_debug(r.text, type='D')
-
+        # self.write_debug(r.text, type='D')
         return self._devices
 
     def get_devices(self, force_update = False):
-        if force_update:
-            return self.update_devices()
+        # if force_update:
+        #     return await self.update_devices()
 
         return self._devices
 
@@ -658,7 +662,7 @@ class Sonoff():
         return self._romVersion
 
     async def async_update(self):
-        devices = self.update_devices()
+        devices = await self.update_devices()
 
     def get_outlets(self, device):
         # information found in ewelink app source code

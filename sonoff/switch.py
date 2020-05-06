@@ -11,6 +11,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     """Add the Sonoff Switch entities"""
 
     entities = []
+
     for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = True):
         outlets_number = hass.data[SONOFF_DOMAIN].get_outlets(device)
 
@@ -39,9 +40,9 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             entity = SonoffSwitch(hass, device)
             entities.append(entity)
 
-    if hass.data[SONOFF_DOMAIN].get_debug_state():
-        debug_entity = SonoffDebugSwitch(hass)
-        entities.append(debug_entity)
+    # if hass.data[SONOFF_DOMAIN].get_debug_state():
+    #     debug_entity = SonoffDebugSwitch(hass)
+    #     entities.append(debug_entity)
 
     if len(entities):
         async_add_entities(entities, update_before_add=False)
