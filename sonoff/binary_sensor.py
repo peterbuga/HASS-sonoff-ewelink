@@ -20,7 +20,9 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
         if 'params' not in device.keys(): continue # this should never happen... but just in case
 
-        if hass.data[SONOFF_DOMAIN].uiid_to_name[device['uiid']] == 'RF_BRIDGE':
+        if hass.data[SONOFF_DOMAIN].device_type_by_uiid(device) and \
+            hass.data[SONOFF_DOMAIN].device_type_by_uiid(device) == 'RF_BRIDGE':
+
             for rf in device['params']['rfList']:
                 for rf_device in device['tags']['zyx_info']: # remote buttons, alarm
                     for btn in rf_device['buttonName']:

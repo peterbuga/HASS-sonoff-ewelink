@@ -16,7 +16,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = False):
 
         # @TODO figure out a better way to detect sonoff iFan02 (or probably iFan03)
-        if 'FAN' in hass.data[SONOFF_DOMAIN].device_type_by_uiid(device):
+        if hass.data[SONOFF_DOMAIN].device_type_by_uiid(device) and \
+            'FAN' in hass.data[SONOFF_DOMAIN].device_type_by_uiid(device):
             entity = SonoffFan(hass, device)
             entities.append(entity)
 

@@ -133,6 +133,7 @@ class Sonoff():
             7       : "SWITCH_2",
             8       : "SWITCH_3",
             9       : "SWITCH_4",
+            77      : "SWITCH_4", 
             10      : "OSPF",
             11      : "CURTAIN",
             12      : "EW-RE",
