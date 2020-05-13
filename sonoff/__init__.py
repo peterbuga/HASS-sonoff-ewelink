@@ -495,7 +495,7 @@ class Sonoff():
                         deviceid
                     )
 
-                    entities.append({"entity" : entity_id, "type": None })
+                    entities.append({"entity_id" : entity_id, "type": None })
 
                 else: # 4-3-2 gang switch
                     for idx, switch in enumerate(params['switches']):
@@ -506,7 +506,7 @@ class Sonoff():
                             str(idx+1)
                         )
 
-                        entities.append({"entity" : entity_id, "type": None })
+                        entities.append({"entity_id" : entity_id, "type": None, "gang": idx})
             else:
                 entity_id = "{}.{}_{}{}".format(
                     entity_type['domain'],
@@ -534,58 +534,65 @@ class Sonoff():
                 continue
 
             # @INFO it happens that sometimes these values are missing
-            if hasattr(entity, 'attributes') and hasattr(entity, 'state'):
-                if 'switches' in params:
-                    if 'FAN' in self.device_type_by_uiid(self.get_device(deviceid)):
-                        # @TODO calculate fan state + light on/off
-                        pass
+            if not hasattr(entity, 'attributes') or not hasattr(entity, 'state'):
+                continue
 
-                    else:
-                        for switch in params['switches']:
-                            attr = {}
-                            if hasattr(self._hass.states.get(entity_id), 'attributes'):
-                                attr = self._hass.states.get(entity_id).attributes
+            if 'switches' in params:
+                if 'FAN' in self.device_type_by_uiid(self.get_device(deviceid)):
+                    # @TODO calculate fan state + light on/off
+                    pass
 
-                            self._hass.states.set(entity_id, switch['switch'], attr)
                 else:
-                    state = entity.state
-                    attr  = entity.attributes
+                    attr = {}
 
-                    if ent['type'] is not None: # it's a sensor entity
-                        state = params[ent['key']]
+                    if hasattr(self._hass.states.get(ent['entity_id']), 'attributes'):
+                        attr = self._hass.states.get(ent['entity_id']).attributes
 
-                    else:
-                        # update the attributes of the "parent" entities
+                    _LOGGER.debug('updating device: {} => {} '.format(
+                        ent['entity_id'],
+                        params['switches'][ent['gang']]['switch']
+                    ))
 
-                        # @TODO learn how to update attrinutes class
-                        # until then they'll be updated via poll refresh of entity
+                    self._hass.states.set(ent['entity_id'], params['switches'][ent['gang']]['switch'], attr)
+            else:
+                state = entity.state
+                attr  = entity.attributes
 
-                        # for at in ['rssi', 'voltage', 'current', 'power',
-                        #     'temperature', 'currentTemperature',
-                        #     'humidity', 'currentHumidity']:
-                        #     if at in params.keys():
-                        #         setattr(attr, at, params[at])
+                if ent['type'] is not None: # it's a sensor entity
+                    state = params[ent['key']]
 
-                        if 'switch' in params:
-                            state = params['switch']
+                else:
+                    # update the attributes of the "parent" entities
 
-                        elif 'state' in params: # light sonoff b1
-                            # @TODO calculate color/color_temp and maybe brightness
-                            state = params['state']
+                    # @TODO learn how to update attributes class
+                    # until then they'll be updated via poll refresh of entity
 
-                        elif 'cmd' in params: # it's an RF trigger
-                            # reset the binary sensor
-                            track_point_in_time(
-                                  self._hass,
-                                  self.reset_binary_sensors,
-                                  dt_util.utcnow() + timedelta(seconds=2)
-                            )
+                    # for at in ['rssi', 'voltage', 'current', 'power',
+                    #     'temperature', 'currentTemperature',
+                    #     'humidity', 'currentHumidity']:
+                    #     if at in params.keys():
+                    #         setattr(attr, at, params[at])
 
-                            state = 'on'
+                    if 'switch' in params:
+                        state = params['switch']
 
-                    _LOGGER.debug('updating: {} {}'.format(ent['entity_id'], state))
+                    elif 'state' in params: # light sonoff b1
+                        # @TODO calculate color/color_temp and maybe brightness
+                        state = params['state']
 
-                    self._hass.states.set(ent['entity_id'], state, attr)
+                    elif 'cmd' in params: # it's an RF trigger
+                        # reset the binary sensor
+                        track_point_in_time(
+                              self._hass,
+                              self.reset_binary_sensors,
+                              dt_util.utcnow() + timedelta(seconds=2)
+                        )
+
+                        state = 'on'
+
+                _LOGGER.debug('updating device: {} => {}'.format(ent['entity_id'], state))
+
+                self._hass.states.set(ent['entity_id'], state, attr)
 
         # data = json.dumps({'device_id' : deviceid, 'params': params})
         # self.write_debug(data, type='s')
