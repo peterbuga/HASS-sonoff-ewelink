@@ -78,9 +78,9 @@ def do_login():
 
 def get_devices():
 	headers.update({'Authorization' : 'Bearer ' + user_details['at']})
-	r = requests.get('https://%s-api.coolkit.cc:8080/api/user/device?lang=en&apiKey=%s&getTags=1' % \
-		(api_region, user_details['user']['apikey']), 
-		headers=headers)
+	r = requests.get(
+		'https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1&appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq'.format(
+			api_region, user_details['user']['apikey']), headers=headers)
 	devices = r.json()
 
 	return json.dumps(devices, indent=2, sort_keys=True)
