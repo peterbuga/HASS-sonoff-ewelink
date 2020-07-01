@@ -1,5 +1,5 @@
 # The domain of your component. Should be equal to the name of your component.
-import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading, hashlib, string
+import logging, time, hmac, random, base64, json, re, threading, hashlib, string
 import voluptuous as vol
 import asyncio
 import aiohttp

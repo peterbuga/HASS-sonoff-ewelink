@@ -1,10 +1,9 @@
-import logging, time, json
+import logging
 
 from homeassistant.components.fan import (SUPPORT_SET_SPEED,
     SPEED_OFF, SPEED_LOW, SPEED_MEDIUM, SPEED_HIGH,
     ATTR_SPEED, ATTR_SPEED_LIST, FanEntity)
 from homeassistant.components.fan import DOMAIN
-# from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 
 _LOGGER = logging.getLogger(__name__)

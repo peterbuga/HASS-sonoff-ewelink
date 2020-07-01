@@ -1,14 +1,9 @@
-import logging, time, hmac, hashlib, random, base64, json, socket
+import logging
 
-from datetime import timedelta
-from homeassistant.util import Throttle
-from homeassistant.components.sensor import DOMAIN
-# from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from homeassistant.components.binary_sensor import (DOMAIN, BinarySensorEntity, DEVICE_CLASS_MOVING)
 from homeassistant.const import STATE_ON, STATE_OFF
 
-# SCAN_INTERVAL = timedelta(seconds=15)
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -1,9 +1,7 @@
-import logging, time, hmac, hashlib, random, base64, json, socket
+import logging
 
 from datetime import timedelta
-from homeassistant.util import Throttle
 from homeassistant.components.sensor import DOMAIN
-# from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import SONOFF_SENSORS_MAP
 

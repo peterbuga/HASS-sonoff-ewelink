@@ -1,8 +1,7 @@
-import logging, time, json
+import logging
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.components.switch import DOMAIN
-# from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 
 _LOGGER = logging.getLogger(__name__)
