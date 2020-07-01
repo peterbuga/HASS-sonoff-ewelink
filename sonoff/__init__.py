@@ -133,7 +133,7 @@ class Sonoff():
             7       : "SWITCH_2",
             8       : "SWITCH_3",
             9       : "SWITCH_4",
-            77      : "SWITCH_4", 
+            77      : "SWITCH_4",
             10      : "OSPF",
             11      : "CURTAIN",
             12      : "EW-RE",
@@ -275,7 +275,7 @@ class Sonoff():
         except:
             _LOGGER.warning("Login failed! retrying... %s", self._api_region)
             self._login_cnt += 1
-            time.sleep(5)
+            await asyncio.sleep(5)
             await self.do_login()
             return
 
