@@ -2,19 +2,23 @@
 import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading, hashlib, string
 import voluptuous as vol
 import asyncio
+import aiohttp
 
 from datetime import timedelta
 from datetime import datetime
 
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers import discovery
-from homeassistant.helpers import config_validation as cv
+from homeassistant.util import dt as dt_util
+from homeassistant.helpers.event import (async_track_time_interval, track_point_in_time)
+from homeassistant.helpers import (config_validation as cv, discovery)
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_SCAN_INTERVAL,
     CONF_EMAIL, CONF_PASSWORD, CONF_USERNAME,
     HTTP_MOVED_PERMANENTLY, HTTP_BAD_REQUEST,
     HTTP_UNAUTHORIZED, HTTP_NOT_FOUND)
+from homeassistant.const import TEMP_CELSIUS
+
+HTTP_NOT_ACCEPTED   = 406
 
 CONF_API_REGION     = 'api_region'
 CONF_GRACE_PERIOD   = 'grace_period'
@@ -22,6 +26,21 @@ CONF_DEBUG          = 'debug'
 CONF_ENTITY_PREFIX  = 'entity_prefix'
 
 DOMAIN              = "sonoff"
+
+SONOFF_SENSORS_MAP = {
+    'power'                 : { 'eid' : 'power',        'uom' : 'W',            'icon' : 'mdi:flash-outline' },
+    'current'               : { 'eid' : 'current',      'uom' : 'A',            'icon' : 'mdi:current-ac' },
+    'voltage'               : { 'eid' : 'voltage',      'uom' : 'V',            'icon' : 'mdi:power-plug' },
+    'dusty'                 : { 'eid' : 'dusty',        'uom' : 'µg/m3',        'icon' : 'mdi:select-inverse' },
+    'light'                 : { 'eid' : 'light',        'uom' : 'lx',           'icon' : 'mdi:car-parking-lights' },
+    'noise'                 : { 'eid' : 'noise',        'uom' : 'Db',           'icon' : 'mdi:surround-sound' },
+
+    'currentHumidity'       : { 'eid' : 'humidity',     'uom' : '%',            'icon' : 'mdi:water-percent' },
+    'humidity'              : { 'eid' : 'humidity',     'uom' : '%',            'icon' : 'mdi:water-percent' },
+
+    'currentTemperature'    : { 'eid' : 'temperature',  'uom' : TEMP_CELSIUS,   'icon' : 'mdi:thermometer' },
+    'temperature'           : { 'eid' : 'temperature',  'uom' : TEMP_CELSIUS,   'icon' : 'mdi:thermometer' }
+}
 
 REQUIREMENTS        = ['uuid', 'websocket-client==0.54.0']
 
@@ -37,7 +56,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Required(CONF_PASSWORD): cv.string,
 
         vol.Optional(CONF_API_REGION, default='eu'): cv.string,
-        vol.Optional(CONF_SCAN_INTERVAL, default=timedelta(seconds=30)): cv.time_period,
+        vol.Optional(CONF_SCAN_INTERVAL, default=timedelta(seconds=600)): cv.time_period,
         vol.Optional(CONF_GRACE_PERIOD, default=600): cv.positive_int,
         vol.Optional(CONF_ENTITY_PREFIX, default=True): cv.boolean,
 
@@ -52,20 +71,22 @@ async def async_setup(hass, config):
 
     hass.data[DOMAIN] = Sonoff(hass, config)
 
+    await hass.data[DOMAIN].do_login()
+
     if hass.data[DOMAIN].get_wshost(): # make sure login was successful
 
-        for component in ['switch','sensor']:
-            discovery.load_platform(hass, component, DOMAIN, {}, config)
+        for component in ['switch', 'sensor', 'binary_sensor', 'light', 'fan']:
+            await discovery.async_load_platform(hass, component, DOMAIN, {}, config)
 
         hass.bus.async_listen('sonoff_state', hass.data[DOMAIN].state_listener)
 
         # close the websocket when HA stops
         # hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, hass.data[DOMAIN].get_ws().close())
 
-        def update_devices(event_time):
+        async def update_devices(event_time):
             asyncio.run_coroutine_threadsafe( hass.data[DOMAIN].async_update(), hass.loop)
 
-        async_track_time_interval(hass, update_devices, hass.data[DOMAIN].get_scan_interval())
+        async_track_time_interval(hass, update_devices, await hass.data[DOMAIN].get_scan_interval())
 
     return True
 
@@ -96,15 +117,83 @@ class Sonoff():
         self._ws            = None
         self._wshost        = None
 
-        self.write_debug('{}', new=True)
-        self.do_login()
+        self._login_cnt     = 0
 
-    def get_scan_interval(self):
+        self.write_debug('{}', new=True)
+
+        self.rf2trig       = {} # dict to hold the mapping of rf triggers IDs to their websocket value response
+        # lazy to store this in another place for now...
+        self.uiid_to_name = {
+            1       : "SOCKET",
+            2       : "SOCKET_2",
+            3       : "SOCKET_3",
+            4       : "SOCKET_4",
+            5       : "SOCKET_POWER",
+            6       : "SWITCH",
+            7       : "SWITCH_2",
+            8       : "SWITCH_3",
+            9       : "SWITCH_4",
+            77      : "SWITCH_4", 
+            10      : "OSPF",
+            11      : "CURTAIN",
+            12      : "EW-RE",
+            13      : "FIREPLACE",
+            14      : "SWITCH_CHANGE",
+            15      : "THERMOSTAT",
+            16      : "COLD_WARM_LED",
+            17      : "THREE_GEAR_FAN",
+            18      : "SENSORS_CENTER",
+            19      : "HUMIDIFIER",
+            22      : "RGB_BALL_LIGHT",
+            23      : "NEST_THERMOSTAT",
+            24      : "GSM_SOCKET",
+            25      : 'AROMATHERAPY',
+            26      : "RuiMiTeWenKongQi",
+            27      : "GSM_UNLIMIT_SOCKET",
+            28      : "RF_BRIDGE",
+            29      : "GSM_SOCKET_2",
+            30      : "GSM_SOCKET_3",
+            31      : "GSM_SOCKET_4",
+            32      : "POWER_DETECTION_SOCKET",
+            33      : "LIGHT_BELT",
+            34      : "FAN_LIGHT",
+            35      : "EZVIZ_CAMERA",
+            36      : "SINGLE_CHANNEL_DIMMER_SWITCH",
+            38      : "HOME_KIT_BRIDGE",
+            40      : "FUJIN_OPS",
+            41      : "CUN_YOU_DOOR",
+            42      : "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT",
+            43      : "",
+            44      : "",
+            45      : "DOWN_CEILING_LIGHT",
+            46      : "AIR_CLEANER",
+            49      : "MACHINE_BED",
+            51      : "COLD_WARM_DESK_LIGHT",
+            52      : "DOUBLE_COLOR_DEMO_LIGHT",
+            53      : "ELECTRIC_FAN_WITH_LAMP",
+            55      : "SWEEPING_ROBOT",
+            56      : "RGB_BALL_LIGHT_4",
+            57      : "MONOCHROMATIC_BALL_LIGHT",
+            59      : "MUSIC_LIGHT_BELT",
+            60      : "NEW_HUMIDIFIER",
+            61      : "KAI_WEI_ROUTER",
+            62      : "MEARICAMERA",
+            66      : "ZIGBEE_MAIN_DEVICE",
+            67      : "RollingDoor",
+            68      : "KOOCHUWAH",
+            1001    : "BLADELESS_FAN",
+            1003    : "WARM_AIR_BLOWER",
+            1000    : "ZIGBEE_SINGLE_SWITCH",
+            1770    : "ZIGBEE_TEMPERATURE_SENSOR",
+            1256    : "ZIGBEE_LIGHT"
+        }
+
+    async def get_scan_interval(self):
         if DOMAIN in self._hass.data and self._hass.data[DOMAIN].get_debug_state():
             self._scan_interval = timedelta(seconds=10)
 
-        elif self._scan_interval < timedelta(seconds=60):
-            self._scan_interval = timedelta(seconds=60)
+        elif self._scan_interval < timedelta(seconds=600):
+            self._scan_interval = timedelta(seconds=600)
 
         return self._scan_interval
 
@@ -116,7 +205,7 @@ class Sonoff():
         # a quick fix between (i-blame-myself) `master` vs. `websocket` implementations
         return self._entity_prefix
 
-    def do_login(self):
+    async def do_login(self):
 
         import uuid
 
@@ -172,82 +261,108 @@ class Sonoff():
             'Content-Type'  : 'application/json;charset=UTF-8'
         }
 
-        r = requests.post('https://{}-api.coolkit.cc:8080/api/user/login'.format(self._api_region),
-            headers=self._headers, json=app_details)
+        if self._login_cnt > 4:
+            _LOGGER.error("SONOFF COMPONENT FAILED TO LOGIN AFTER 5 ATTEMPTS!")
+            return
 
-        resp = r.json()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    'https://{}-api.coolkit.cc:8080/api/user/login'.format(self._api_region),
+                    headers=self._headers, json=app_details, timeout=30) as r:
+                    resp = await r.json()
 
-        # get a new region to login
-        if 'error' in resp and 'region' in resp and resp['error'] == HTTP_MOVED_PERMANENTLY:
-            self._api_region    = resp['region']
-            self._wshost        = None
+        except:
+            _LOGGER.warning("Login failed! retrying... %s", self._api_region)
+            self._login_cnt += 1
+            time.sleep(5)
+            await self.do_login()
+            return
 
-            _LOGGER.warning("found new region: >>> %s <<< (you should change api_region option to this value in configuration.yaml)", self._api_region)
+        else:
+            # get a new region to login
+            if 'error' in resp and 'region' in resp and resp['error'] == HTTP_MOVED_PERMANENTLY:
+                self._api_region    = resp['region']
+                self._wshost        = None
 
-            # re-login using the new localized endpoint
-            self.do_login()
+                _LOGGER.warning("found new region: >>> %s <<< (you should change api_region option to this value in configuration.yaml)", self._api_region)
 
-        elif 'error' in resp and resp['error'] in [HTTP_NOT_FOUND, HTTP_BAD_REQUEST]:
-            # (most likely) login with +86... phone number and region != cn
-            if '@' not in self._username and self._api_region in ['eu', 'us']:
-                # self._api_region = 'cn'
-                # self.do_login()
-                _LOGGER.error('Login failed! try to change the api_region to \'cn\' OR \'as\'')
+                # re-login using the new localized endpoint
+                await self.do_login()
+
+            elif 'error' in resp and resp['error'] in [HTTP_NOT_FOUND, HTTP_BAD_REQUEST]:
+                # (most likely) login with +86... phone number and region != cn
+                if '@' not in self._username and self._api_region in ['eu', 'us']:
+                    # self._api_region = 'cn'
+                    # self.do_login()
+                    _LOGGER.error('Login failed! try to change the api_region to \'cn\' OR \'as\'')
+
+                else:
+                    _LOGGER.error("Couldn't authenticate using the provided credentials!")
 
             else:
-                _LOGGER.error("Couldn't authenticate using the provided credentials!")
 
-        else:
-            if 'at' not in resp:
-                _LOGGER.error('Login failed! Please check credentials!')
-                return
+                if 'at' not in resp:
+                    _LOGGER.error('Login failed! Please check credentials!')
+                    return
 
-            self._bearer_token  = resp['at']
-            self._user_apikey   = resp['user']['apikey']
-            self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
+                self._bearer_token  = resp['at']
+                self._user_apikey   = resp['user']['apikey']
+                self._headers.update({'Authorization' : 'Bearer ' + self._bearer_token})
 
-            self.update_devices() # to write the devices list
+                await self.update_devices() # to write the devices list
 
-            # get/find the websocket host
-            if not self._wshost:
-                self.set_wshost()
+                # get/find the websocket host
+                if not self._wshost:
+                    await self.set_wshost()
 
-            if self.get_wshost() is not None:
-                self.thread = threading.Thread(target=self.init_websocket)
-                self.thread.daemon = True
-                self.thread.start()
+                if self.get_wshost() is not None:
+                    self.thread = threading.Thread(target=self.init_websocket)
+                    self.thread.daemon = True
+                    self.thread.start()
 
-    def set_wshost(self):
-        r = requests.post('https://%s-disp.coolkit.cc:8080/dispatch/app' % self._api_region, headers=self._headers)
-        resp = r.json()
+    async def set_wshost(self):
+        async with aiohttp.ClientSession() as session:
+            async with session.post('https://%s-disp.coolkit.cc:8080/dispatch/app' % self._api_region, headers=self._headers) as r:
+                resp = await r.json()
 
-        if 'error' in resp and resp['error'] == 0 and 'domain' in resp:
-            self._wshost = resp['domain']
-            _LOGGER.info("Found websocket address: %s", self._wshost)
-        else:
-            _LOGGER.error("Couldn't find a valid websocket host, abording Sonoff init")
+                if 'error' in resp and resp['error'] == 0 and 'domain' in resp:
+                    self._wshost = resp['domain']
+                    _LOGGER.info("Found websocket address: %s", self._wshost)
+                else:
+                    _LOGGER.error("Couldn't find a valid websocket host, abording Sonoff init")
 
     async def state_listener(self, event):
         if not self.get_ws().connected:
             _LOGGER.error('websocket is not connected')
             return
 
-        _LOGGER.debug('received state event change from: %s' % event.data['deviceid'])
+        _LOGGER.debug('Received state event change for: %s' % event.data['deviceid'])
 
-        new_state = event.data['state']
+        params = event.data.get('params', None)
 
-        # convert from True/False to on/off
-        if isinstance(new_state, (bool)):
-            new_state = 'on' if new_state else 'off'
+        if params is None:
+            _LOGGER.error('improper event state sent')
+            return
+
+        # # convert from True/False to on/off
+        # if isinstance(new_state, (bool)):
+        #     new_state = 'on' if new_state else 'off'
 
         device = self.get_device(event.data['deviceid'])
-        outlet = event.data['outlet']
+        # outlet = event.data.get('outlet', None)
 
-        if outlet is not None:
+        if 'outlet' in params: # it's a multi switch capable device
+
             _LOGGER.debug("Switching `%s - %s` on outlet %d to state: %s", \
-                device['deviceid'], device['name'] , (outlet+1) , new_state)
+                device['deviceid'], device['name'] , (int(params['outlet']) + 1), params['switch'])
+
+            p = { 'switches' : device['params']['switches'] }
+            p['switches'][params['outlet']]['switch'] = params['switch']
+            params = p
+
         else:
-            _LOGGER.debug("Switching `%s` to state: %s", device['deviceid'], new_state)
+            _LOGGER.debug("Device `%s` change to: %s", device['deviceid'], json.dumps(params))
 
         if not device:
             _LOGGER.error('unknown device to be updated')
@@ -262,12 +377,6 @@ class Sonoff():
               apikey      = device apikey
               selfApiKey  = login apikey (yes, it's typed corectly selfApikey and not selfApiKey :|)
         """
-        if outlet is not None:
-            params = { 'switches' : device['params']['switches'] }
-            params['switches'][outlet]['switch'] = new_state
-
-        else:
-            params = { 'switch' : new_state }
 
         payload = {
             'action'        : 'update',
@@ -289,13 +398,13 @@ class Sonoff():
         # set also te pseudo-internal state of the device until the real refresh kicks in
         for idxd, dev in enumerate(self._devices):
             if dev['deviceid'] == device['deviceid']:
-                if outlet is not None:
-                    self._devices[idxd]['params']['switches'][outlet]['switch'] = new_state
+                if 'outlet' in params:
+                    self._devices[idxd]['params']['switches'][params['outlet']]['switch'] = params['switch']
                 else:
-                    self._devices[idxd]['params']['switch'] = new_state
+                    self._devices[idxd]['params'].update(params)
 
-        data = json.dumps({'entity_id' : str(device['deviceid']), 'outlet': outlet, 'new_state' : new_state})
-        self.write_debug(data, type='S')
+        # data = json.dumps({'device_id' : str(device['deviceid']), 'params' : params})
+        # self.write_debug(data, type='S')
 
     def init_websocket(self):
         # keep websocket open indefinitely
@@ -315,21 +424,17 @@ class Sonoff():
         _LOGGER.debug('websocket msg: %s', data)
 
         data = json.loads(data)
-        if 'action' in data and data['action'] == 'update' and 'params' in data:
-            if 'switch' in data['params'] or 'switches' in data['params']:
-                for idx, device in enumerate(self._devices):
-                    if device['deviceid'] == data['deviceid']:
-                        self._devices[idx]['params'] = data['params']
+        if 'action' in data and data['action'] in ['update', 'sysmsg'] and 'params' in data:
+            for idx, device in enumerate(self._devices):
+                if device['deviceid'] == data['deviceid']:
 
-                        if 'switches' in data['params']:
-                            for switch in data['params']['switches']:
-                                self.set_entity_state(data['deviceid'], switch['switch'], switch['outlet'])
-                        else:
-                            self.set_entity_state(data['deviceid'], data['params']['switch'])
+                    self._devices[idx]['params'].update(data['params'])
+                    self.set_entity_state(data['deviceid'], data['params'])
 
-                        break # do not remove
+                    break # do not remove
 
-        self.write_debug(json.dumps(data), type='W')
+
+        # self.write_debug(json.dumps(data), type='W')
 
     def on_error(self, *args):
         error = args[-1] # to accomodate the case when the function receives 2 or 3 args
@@ -344,22 +449,165 @@ class Sonoff():
 
         return grace_status
 
-    def set_entity_state(self, deviceid, state, outlet=None):
-        entity_id = 'switch.%s%s%s' % (
-            'sonoff_' if self._entity_prefix else '',
-            deviceid,
-            '_'+str(outlet+1) if outlet is not None else ''
-        )
+    # TBH this starts to look like ewelink app spaghetti code :(
+    def get_device_entity_types(self, deviceid, params): # switch, light, etc
+        entity_types = []
+        device = self.get_device(deviceid)
 
-        # possible @PATCH when (i assume) the device is reported offline in HA but an update comes from websocket
-        if hasattr(self._hass.states.get(entity_id), 'attributes'):
-            attr = self._hass.states.get(entity_id).attributes
-            self._hass.states.set(entity_id, state, attr)
+        if 'FAN' in self.device_type_by_uiid(device):
+            entity_types.append({'domain': 'fan',   'type': None})
+            entity_types.append({'domain': 'light', 'type': None})
 
-        data = json.dumps({'entity_id' : entity_id, 'outlet': outlet, 'state' : state})
-        self.write_debug(data, type='s')
+        elif 'state' in device['params'] and 'switch' not in device['params']:
+            entity_types.append({'domain': 'light', 'type': None}) # sonoff b1
 
-    def update_devices(self):
+        elif self.uiid_to_name[device['uiid']] == 'RF_BRIDGE':
+            entity_types.append({'domain': 'binary_sensor', 'type': None})
+
+        elif 'switch' in device['params'] or 'switches' in device['params']:
+            entity_types.append({'domain': 'switch', 'type': None})
+
+            # add sensors list
+            for sensor_type in SONOFF_SENSORS_MAP.keys():
+                if sensor_type in params.keys():
+                    entity_types.append({
+                        'domain': 'sensor',
+                        'type'  : SONOFF_SENSORS_MAP[sensor_type]['eid'],
+                        'key'   : sensor_type
+                    })
+
+        # elif 'switches' in device['params']:
+        #     entity_types.append({'domain': 'switch', 'type': None})
+
+        return entity_types
+
+    def set_entity_state(self, deviceid, params):
+        entities = []
+
+        device_entity_types = self.get_device_entity_types(deviceid, params)
+        for entity_type in device_entity_types:
+            if 'switches' in params:
+
+                # stupid itead serialization
+                if 'FAN' in self.device_type_by_uiid(self.get_device(deviceid)):
+                    entity_id = "{}.{}_{}".format(
+                        entity_type['domain'],
+                        DOMAIN if self._entity_prefix else '',
+                        deviceid
+                    )
+
+                    entities.append({"entity_id" : entity_id, "type": None })
+
+                else: # 4-3-2 gang switch
+                    for idx, switch in enumerate(params['switches']):
+                        entity_id = "{}.{}_{}_{}".format(
+                            entity_type['domain'],
+                            DOMAIN if self._entity_prefix else '',
+                            deviceid,
+                            str(idx+1)
+                        )
+
+                        entities.append({"entity_id" : entity_id, "type": None, "gang": idx})
+            else:
+                entity_id = "{}.{}_{}{}".format(
+                    entity_type['domain'],
+                    DOMAIN if self._entity_prefix else '',
+                    deviceid if 'cmd' not in params.keys() else self.rf2trig[list(params.keys())[-1]], # for rf bridge use trigger ID
+                    '_' + entity_type['type'] if entity_type['type'] is not None else ''
+                )
+
+                entities.append({
+                    "entity_id" : entity_id,
+                    "type"      : entity_type['type'],
+                    "key"       : entity_type['key'] if 'key' in entity_type else None
+                })
+
+        # @TODO update the availability
+        # if 'online' in params:
+        #    pass
+
+        for ent in entities:
+            entity = self._hass.states.get(ent['entity_id'])
+
+            # ugly fix to overcome the 2-3 gang switches
+            # should be on-par with the generation part in switch.py
+            if not entity:
+                continue
+
+            # @INFO it happens that sometimes these values are missing
+            if not hasattr(entity, 'attributes') or not hasattr(entity, 'state'):
+                continue
+
+            if 'switches' in params:
+                if 'FAN' in self.device_type_by_uiid(self.get_device(deviceid)):
+                    # @TODO calculate fan state + light on/off
+                    pass
+
+                else:
+                    attr = {}
+
+                    if hasattr(self._hass.states.get(ent['entity_id']), 'attributes'):
+                        attr = self._hass.states.get(ent['entity_id']).attributes
+
+                    _LOGGER.debug('updating device: {} => {} '.format(
+                        ent['entity_id'],
+                        params['switches'][ent['gang']]['switch']
+                    ))
+
+                    self._hass.states.set(ent['entity_id'], params['switches'][ent['gang']]['switch'], attr)
+            else:
+                state = entity.state
+                attr  = entity.attributes
+
+                if ent['type'] is not None: # it's a sensor entity
+                    state = params[ent['key']]
+
+                else:
+                    # update the attributes of the "parent" entities
+
+                    # @TODO learn how to update attributes class
+                    # until then they'll be updated via poll refresh of entity
+
+                    # for at in ['rssi', 'voltage', 'current', 'power',
+                    #     'temperature', 'currentTemperature',
+                    #     'humidity', 'currentHumidity']:
+                    #     if at in params.keys():
+                    #         setattr(attr, at, params[at])
+
+                    if 'switch' in params:
+                        state = params['switch']
+
+                    elif 'state' in params: # light sonoff b1
+                        # @TODO calculate color/color_temp and maybe brightness
+                        state = params['state']
+
+                    elif 'cmd' in params: # it's an RF trigger
+                        # reset the binary sensor
+                        track_point_in_time(
+                              self._hass,
+                              self.reset_binary_sensors,
+                              dt_util.utcnow() + timedelta(seconds=2)
+                        )
+
+                        state = 'on'
+
+                _LOGGER.debug('updating device: {} => {}'.format(ent['entity_id'], state))
+
+                self._hass.states.set(ent['entity_id'], state, attr)
+
+        # data = json.dumps({'device_id' : deviceid, 'params': params})
+        # self.write_debug(data, type='s')
+
+    # @TODO @FIX too ugly!!!!!
+    def reset_binary_sensors(self, now=None):
+        for device in self.get_devices():
+            if self.uiid_to_name[device['uiid']] == 'RF_BRIDGE':
+                for rf in device['params']['rfList']:
+                    entity = self._hass.states.get('binary_sensor.sonoff_'+rf['rfVal'].lower())
+                    attr  = entity.attributes
+                    self._hass.states.set('binary_sensor.sonoff_'+rf['rfVal'].lower(), 'off', attr)
+
+    async def update_devices(self):
         if self.get_user_apikey() is None:
             _LOGGER.error("Initial login failed, devices cannot be updated!")
             return self._devices
@@ -369,14 +617,13 @@ class Sonoff():
             _LOGGER.info("Grace period active")
             return self._devices
 
-        r = requests.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1&version=6&ts=%s&nonce=%s&appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq&imei=%s&os=iOS&model=%s&romVersion=%s&appVersion=%s'.format(
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://{}-api.coolkit.cc:8080/api/user/device?lang=en&apiKey={}&getTags=1&version=6&ts=%s&nonce=%s&appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq&imei=%s&os=iOS&model=%s&romVersion=%s&appVersion=%s'.format(
             self._api_region, self.get_user_apikey(), str(int(time.time())), ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8)), self._imei, self._model, self._romVersion, self._appVersion
-            ), headers=self._headers)
+            ), headers=self._headers) as r:
+                resp = await r.json()
 
-        # _LOGGER.error(r.text)
-
-        resp = r.json()
-        if 'error' in resp and resp['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED]:
+        if 'error' in resp and resp['error'] in [HTTP_BAD_REQUEST, HTTP_UNAUTHORIZED, HTTP_NOT_ACCEPTED]:
             # @IMPROVE add maybe a service call / switch to deactivate sonoff component
             if self.is_grace_period():
                 _LOGGER.warning("Grace period activated!")
@@ -386,17 +633,16 @@ class Sonoff():
                 return self._devices
 
             _LOGGER.info("Re-login component")
-            self.do_login()
+            await self.do_login()
 
-        self._devices = r.json()['devicelist'] if 'devicelist' in r.json() else r.json()
+        self._devices = resp['devicelist'] if 'devicelist' in resp else resp
 
-        self.write_debug(r.text, type='D')
-
+        # self.write_debug(r.text, type='D')
         return self._devices
 
     def get_devices(self, force_update = False):
-        if force_update:
-            return self.update_devices()
+        # if force_update:
+        #     return await self.update_devices()
 
         return self._devices
 
@@ -424,7 +670,7 @@ class Sonoff():
         return self._romVersion
 
     async def async_update(self):
-        devices = self.update_devices()
+        devices = await self.update_devices()
 
     def get_outlets(self, device):
         # information found in ewelink app source code
@@ -449,76 +695,14 @@ class Sonoff():
             'CUN_YOU_DOOR'          : 4
         }
 
-        uiid_to_name = {
-            1       : "SOCKET",
-            2       : "SOCKET_2",
-            3       : "SOCKET_3",
-            4       : "SOCKET_4",
-            5       : "SOCKET_POWER",
-            6       : "SWITCH",
-            7       : "SWITCH_2",
-            8       : "SWITCH_3",
-            9       : "SWITCH_4",
-            10      : "OSPF",
-            11      : "CURTAIN",
-            12      : "EW-RE",
-            13      : "FIREPLACE",
-            14      : "SWITCH_CHANGE",
-            15      : "THERMOSTAT",
-            16      : "COLD_WARM_LED",
-            17      : "THREE_GEAR_FAN",
-            18      : "SENSORS_CENTER",
-            19      : "HUMIDIFIER",
-            22      : "RGB_BALL_LIGHT",
-            23      : "NEST_THERMOSTAT",
-            24      : "GSM_SOCKET",
-            25      : 'AROMATHERAPY',
-            26      : "RuiMiTeWenKongQi",
-            27      : "GSM_UNLIMIT_SOCKET",
-            28      : "RF_BRIDGE",
-            29      : "GSM_SOCKET_2",
-            30      : "GSM_SOCKET_3",
-            31      : "GSM_SOCKET_4",
-            32      : "POWER_DETECTION_SOCKET",
-            33      : "LIGHT_BELT",
-            34      : "FAN_LIGHT",
-            35      : "EZVIZ_CAMERA",
-            36      : "SINGLE_CHANNEL_DIMMER_SWITCH",
-            38      : "HOME_KIT_BRIDGE",
-            40      : "FUJIN_OPS",
-            41      : "CUN_YOU_DOOR",
-            42      : "SMART_BEDSIDE_AND_NEW_RGB_BALL_LIGHT",
-            43      : "",
-            44      : "",
-            45      : "DOWN_CEILING_LIGHT",
-            46      : "AIR_CLEANER",
-            49      : "MACHINE_BED",
-            51      : "COLD_WARM_DESK_LIGHT",
-            52      : "DOUBLE_COLOR_DEMO_LIGHT",
-            53      : "ELECTRIC_FAN_WITH_LAMP",
-            55      : "SWEEPING_ROBOT",
-            56      : "RGB_BALL_LIGHT_4",
-            57      : "MONOCHROMATIC_BALL_LIGHT",
-            59      : "MUSIC_LIGHT_BELT",
-            60      : "NEW_HUMIDIFIER",
-            61      : "KAI_WEI_ROUTER",
-            62      : "MEARICAMERA",
-            66      : "ZIGBEE_MAIN_DEVICE",
-            67      : "RollingDoor",
-            68      : "KOOCHUWAH",
-            1001    : "BLADELESS_FAN",
-            1003    : "WARM_AIR_BLOWER",
-            1000    : "ZIGBEE_SINGLE_SWITCH",
-            1770    : "ZIGBEE_TEMPERATURE_SENSOR",
-            1256    : "ZIGBEE_LIGHT"
-        }
-
-        if device['uiid'] in uiid_to_name.keys() and \
-            uiid_to_name[device['uiid']] in name_to_outlets.keys():
-            return name_to_outlets[uiid_to_name[device['uiid']]]
+        if device['uiid'] in self.uiid_to_name.keys() and \
+            self.uiid_to_name[device['uiid']] in name_to_outlets.keys():
+            return name_to_outlets[self.uiid_to_name[device['uiid']]]
 
         return None
 
+    def device_type_by_uiid(self, device):
+        return self.uiid_to_name.get(device['uiid'], None)
     ### sonog_debug.log section ###
     def write_debug(self, data, type = '', new = False):
 
@@ -570,7 +754,7 @@ class Sonoff():
         data = re.sub(r'"phoneNumber": ".*"', '"phoneNumber": "[hidden]",', data)
         # data = re.sub(r'"name": ".*"', '"name": "[hidden]",', data)
         data = re.sub(r'"ip": ".*",', '"ip": "[hidden]",', data)
-        #data = re.sub(r'"deviceid": ".*",', '"deviceid": "[hidden]",', data)
+        # data = re.sub(r'"deviceid": ".*",', '"deviceid": "[hidden]",', data)
         # data = re.sub(r'"_id": ".*",', '"_id": "[hidden]",', data)
         data = re.sub(r'"\w{2}:\w{2}:\w{2}:\w{2}:\w{2}:\w{2}"', '"xx:xx:xx:xx:xx:xx"', data)
         data = re.sub(r'"\w{8}-\w{4}-\w{4}-\w{4}-\w{12}"', '"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"', data)
@@ -596,11 +780,12 @@ class WebsocketListener(threading.Thread, websocket.WebSocketApp):
         self.last_update = time.time()
 
         payload = {
-            'action'    : "userOnline",
+            'appid'     : 'oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq',
+            'action'    : 'userOnline',
             'userAgent' : 'app',
             'version'   : 6,
             'nonce'     : ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8)),
-            'apkVersion': "1.8",
+            'apkVersion': '1.8',
             'os'        : 'iOS',
             'at'        : self._sonoff.get_bearer_token(),
             'apikey'    : self._sonoff.get_user_apikey(),
@@ -687,7 +872,11 @@ class SonoffDevice(Entity):
             return device['params']['switches'][self._outlet]['switch'] == 'on' if device else False
 
         else:
-            return device['params']['switch'] == 'on' if device else False
+            # `state` for B1
+            # `switch` for everything else
+
+            state_key = 'state' if 'state' in device['params'] and not 'switch' in device['params'] else 'switch'
+            return device['params'][state_key] == 'on' if device else False
 
     def get_available(self):
         device = self.get_device()
@@ -716,6 +905,17 @@ class SonoffDevice(Entity):
         # we don't update here because there's 1 single thread that can be active at anytime
         # and the websocket will send the state update messages
         pass
+
+    @property
+    def device_info(self):
+        """Return the device info."""
+
+        device = self.get_device()
+
+        return {
+            'model' : device['productModel'],
+            'mac'   : device['params']['staMac']
+        }
 
 
     @property

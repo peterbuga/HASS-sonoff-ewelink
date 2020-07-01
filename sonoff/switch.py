@@ -11,8 +11,15 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     """Add the Sonoff Switch entities"""
 
     entities = []
+
     for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = True):
         outlets_number = hass.data[SONOFF_DOMAIN].get_outlets(device)
+
+        # @TODO figure out a better way to detect sonoff iFan02 (or probably iFan03)
+        # this entity will be split and picked up by `light` + `fan` entities
+        if hass.data[SONOFF_DOMAIN].device_type_by_uiid(device) and \
+            'FAN' in hass.data[SONOFF_DOMAIN].device_type_by_uiid(device):
+            continue
 
         if outlets_number is None: # fallback to whatever the device might have
             if 'switches' in device['params']: # the device has multiple switches, split them by outlets
@@ -20,7 +27,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                     entity = SonoffSwitch(hass, device, outlet['outlet'])
                     entities.append(entity)
 
-            elif 'switch' in device['params'] or 'state' in device['params']:
+            elif 'switch' in device['params']:
                 entity = SonoffSwitch(hass, device)
                 entities.append(entity)
 
@@ -30,13 +37,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 entities.append(entity)
 
         # normal device = Sonoff Basic (and alike)
-        elif 'switch' in device['params'] or 'state' in device['params']: #ignore devices like Sonoff RF bridge:
+        elif 'switch' in device['params']: #ignore devices like Sonoff RF bridge:
             entity = SonoffSwitch(hass, device)
             entities.append(entity)
 
-    if hass.data[SONOFF_DOMAIN].get_debug_state():
-        debug_entity = SonoffDebugSwitch(hass)
-        entities.append(debug_entity)
+    # if hass.data[SONOFF_DOMAIN].get_debug_state():
+    #     debug_entity = SonoffDebugSwitch(hass)
+    #     entities.append(debug_entity)
 
     if len(entities):
         async_add_entities(entities, update_before_add=False)
@@ -77,19 +84,26 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
 
     def turn_on(self, **kwargs):
         """Turn the device on."""
+        params = {'switch' : 'on'}
+        if self._outlet is not None:
+            params.update({'outlet' : self._outlet})
+
         self._hass.bus.async_fire('sonoff_state', {
-            'state'     : True,
             'deviceid'  : self._deviceid,
-            'outlet'    : self._outlet
+            'params'    : params
         })
         self.async_schedule_update_ha_state()
 
     def turn_off(self, **kwargs):
         """Turn the device off."""
+
+        params = {'switch' : 'off'}
+        if self._outlet is not None:
+            params.update({'outlet' : self._outlet})
+
         self._hass.bus.async_fire('sonoff_state', {
-            'state'     : False,
             'deviceid'  : self._deviceid,
-            'outlet'    : self._outlet
+            'params'    : params
         })
         self.async_schedule_update_ha_state()
 

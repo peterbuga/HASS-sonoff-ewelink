@@ -2,7 +2,7 @@
 Simple Home Assistant component to add/control Sonoff/eWeLink smart devices using the stock firmware and retaining the cloud capabilities.
 
 ***
-### WARNING: completely deactivate the `sonoff` component from HA while doing a firmware update, due to auto-relogin function you might be kicked out of the app before the process is completed. I would not be held liable for any problems occuring if not following this steps!
+### WARNING: completely deactivate the `sonoff` component from HA while doing a firmware update, due to auto-relogin function you might be kicked out of the app before the process is completed. I would not be held liable for any problems occurring if not following this steps!
 ***
 
 **CHECK COMPATIBILITY LIST BELOW (not everyday updated)! 
@@ -28,6 +28,9 @@ And copy the *.py files in `custom_components` folder using the same structure l
         └── __init__.py
         └── switch.py
         └── sensor.py
+        └── light.py
+        └── binary_sensor.py
+        └── fan.py
 ```
 
 `email` [Deprecated] used only for compatibility, may be eliminated in future.
@@ -55,7 +58,7 @@ steps and how it works:
 
 **NOTICE**: you should **NOT** leave debug-mode enabled for everyday use, please please just don't!
  
-This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (althought I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
+This is just a proof of concept because I searched for it and there was no implementation to use Sonoff/eWeLink devices without flashing them. (although I know how to do it, I don't have a real extensive usage for now and I prefer to keep them on stock firmware).
 
 
 ## Compatibility list
@@ -66,7 +69,9 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff Basic R3                                                                                                                                                     |    yes    |     |       |     |       |       |       |       |       | yes                          |                                                                                            |
 | Sonoff Dual                                                                                                                                                       |    yes    |     |       |     |       |       |       |       |       |                              |                                                                                            |
 | Sonoff RF                                                                                                                                                         |    yes    |     |       | yes | yes   |       |       |  yes  |       |                              |                                                                                            |
-| Sonoff SC (retired)                                                                                                                                               |           |     |       |     |       | yes   |       |       |       |                              | hum/temp/dust/light/noise sensors                                                          |
+| Sonoff B1                                                                                                                                                |    yes    |     |       |     |       |      |       |       |       |                              | ON/OFF, warm/cool white, colors                                                          |
+| Sonoff SC                                                                                                                                                |    yes    |     |       |     |       | yes   |       |       |       |                              | hum/temp/dust/light/noise sensors                                                          |
+| Sonoff RF Bridge                                                                                                                                               |    yes    |     |       |     |       | yes   |       |       |       |                              | binary sensors that are ON for ~2sec                                                          |
 | Sonoff G1                                                                                                                                                         |     ?     |     |       |     |       |       |       |       |       |                              |                                                                                            |
 | Sonoff 4CH Pro                                                                                                                                                    |    yes    |     |       | yes |       |       |  yes  |       |  yes  |                              |                                                                                            |
 | Sonoff 4CH Pro R2                                                                                                                                                 |    yes    |     |       | yes |       |       |       |  yes  |  yes  |                              |                                                                                            |
@@ -82,8 +87,8 @@ This is just a proof of concept because I searched for it and there was no imple
 | Sonoff Pow                                                                                                                                                        |    yes    |     |       |     |       |       |       |       |       |                              | + power sensor                                                                             |
 | Sonoff Pow R2                                                                                                                                                     |    yes    |     |       |     |       |       |       |       |       | partial **NO sensors data!** | + power/current/voltage sensors                                                            |
 | Sonoff TH10/TH16                                                                                                                                                  |    yes    |     |       |     |       |       |       |       |       |                              | + temp/humidity sensors                                                                    |
-| Sonoff iFan02                                                                                                                                                     |    yes    |     |       |     |       |       |       |       |       |                              | it creates 4 switches, 1 for the light and 3 for the various fan speeds                    |
-| Sonoff iFan03                                                                                                                                                     |    yes    |     |       |     |       |       |       |       |       |                              | it creates 4 switches, 1 for the light and 3 for the various fan speeds                    |
+| Sonoff iFan02                                                                                                                                                     |    yes    |     |       |     |       |       |       |       |       |                              | 1 fan + 1 light entities |
+| Sonoff iFan03                                                                                                                                                     |    yes    |     |       |     |       |       |       |       |       |                              | 1 fan + 1 light entities |
 | Sonoff HT-TH31                                                                                                                                                    |     ?     |     |       |     |       |       |       |       |       |                              |                                                                                            |
 | [Sonoff Slampher RF](https://www.gearbest.com/smart-light-bulb/pp_1824903.html)                                                                                   |    yes    |     |       |     |       |       |  yes  |  yes  |  yes  |              yes             |                                                                                            |
 | [3 Gang Generic Wall Switch](https://www.amazon.in/gp/product/B07FLY398G)                                                                                         |    yes    |     |       | yes |       |       |       |       |       |              yes             | Manfufacturer: pro-sw, Model: PS-15-ES (according to ewelink app)                          |
