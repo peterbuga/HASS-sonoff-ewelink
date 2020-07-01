@@ -1,6 +1,6 @@
 import logging, time, json
 
-from homeassistant.components.switch import SwitchDevice
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.components.switch import DOMAIN
 # from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
@@ -48,7 +48,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     if len(entities):
         async_add_entities(entities, update_before_add=False)
 
-class SonoffSwitch(SonoffDevice, SwitchDevice):
+class SonoffSwitch(SonoffDevice, SwitchEntity):
     """Representation of a Sonoff switch device."""
 
     def __init__(self, hass, device, outlet = None):
@@ -122,7 +122,7 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
 
         return entity_id
 
-class SonoffDebugSwitch(SwitchDevice):
+class SonoffDebugSwitch(SwitchEntity):
     def __init__(self, hass):
         self._hass = hass
 

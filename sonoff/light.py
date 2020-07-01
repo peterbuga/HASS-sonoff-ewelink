@@ -2,7 +2,7 @@ import logging, time, json
 
 from homeassistant.components.light import (SUPPORT_BRIGHTNESS, SUPPORT_COLOR_TEMP,
     SUPPORT_EFFECT, SUPPORT_FLASH, SUPPORT_COLOR, SUPPORT_TRANSITION, SUPPORT_WHITE_VALUE,
-    Light as LightDevice)
+    LightEntity)
 from homeassistant.components.light import DOMAIN
 # from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
@@ -31,7 +31,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     if len(entities):
         async_add_entities(entities, update_before_add=False)
 
-class SonoffLight(SonoffDevice, LightDevice):
+class SonoffLight(SonoffDevice, LightEntity):
     """Representation of a Sonoff switch device."""
 
     def __init__(self, hass, device):

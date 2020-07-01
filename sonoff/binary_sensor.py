@@ -5,7 +5,7 @@ from homeassistant.util import Throttle
 from homeassistant.components.sensor import DOMAIN
 # from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
-from homeassistant.components.binary_sensor import (DOMAIN, BinarySensorDevice, DEVICE_CLASS_MOVING)
+from homeassistant.components.binary_sensor import (DOMAIN, BinarySensorEntity, DEVICE_CLASS_MOVING)
 from homeassistant.const import STATE_ON, STATE_OFF
 
 # SCAN_INTERVAL = timedelta(seconds=15)
@@ -39,7 +39,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     if len(entities):
         async_add_entities(entities, update_before_add=False)
 
-class SonoffSensorRF(SonoffDevice, BinarySensorDevice):
+class SonoffSensorRF(SonoffDevice, BinarySensorEntity):
     """Representation of a Sonoff RF binary sensor."""
 
     def __init__(self, hass, device, rf = None):
