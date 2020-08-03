@@ -2,6 +2,7 @@
 import logging, time, hmac, hashlib, random, base64, json, socket, requests, re, threading, hashlib, string
 import voluptuous as vol
 import asyncio
+import websocket
 
 from datetime import timedelta
 from datetime import datetime
@@ -22,10 +23,6 @@ CONF_DEBUG          = 'debug'
 CONF_ENTITY_PREFIX  = 'entity_prefix'
 
 DOMAIN              = "sonoff"
-
-REQUIREMENTS        = ['uuid', 'websocket-client==0.54.0']
-
-import websocket
 
 _LOGGER = logging.getLogger(__name__)
 
