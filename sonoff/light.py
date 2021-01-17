@@ -243,15 +243,15 @@ class SonoffLight(SonoffDevice, LightEntity):
 
     # entity id is required if the name use other characters not in ascii
     @property
-    def entity_id(self):
+    def unique_id(self):
         """Return the unique id of the light."""
 
         if self._hass.data[SONOFF_DOMAIN].get_entity_prefix():
-            entity_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid)
+            unique_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid)
         else:
-            entity_id = "{}.{}".format(DOMAIN, self._deviceid)
+            unique_id = "{}.{}".format(DOMAIN, self._deviceid)
 
-        return entity_id
+        return unique_id
 
     @property
     def device_state_attributes(self):

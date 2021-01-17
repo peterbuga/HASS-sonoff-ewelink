@@ -108,18 +108,18 @@ class SonoffSwitch(SonoffDevice, SwitchEntity):
 
     # entity id is required if the name use other characters not in ascii
     @property
-    def entity_id(self):
+    def unique_id(self):
         """Return the unique id of the switch."""
 
         if self._hass.data[SONOFF_DOMAIN].get_entity_prefix():
-            entity_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid)
+            unique_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid)
         else:
-            entity_id = "{}.{}".format(DOMAIN, self._deviceid)
+            unique_id = "{}.{}".format(DOMAIN, self._deviceid)
 
         if self._outlet is not None:
-            entity_id = "{}_{}".format(entity_id, str(self._outlet+1))
+            unique_id = "{}_{}".format(unique_id, str(self._outlet+1))
 
-        return entity_id
+        return unique_id
 
 class SonoffDebugSwitch(SwitchEntity):
     def __init__(self, hass):

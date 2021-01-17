@@ -66,7 +66,7 @@ class SonoffSensorRF(SonoffDevice, BinarySensorEntity):
 
     # entity id is required if the name use other characters not in ascii
     @property
-    def entity_id(self):
+    def unique_id(self):
         """Return the unique id of the switch."""
-        entity_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._rf['rfVal'].lower())
-        return entity_id
+        unique_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._rf['rfVal'].lower())
+        return unique_id

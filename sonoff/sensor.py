@@ -55,10 +55,10 @@ class SonoffSensor(SonoffDevice):
 
     # entity id is required if the name use other characters not in ascii
     @property
-    def entity_id(self):
+    def unique_id(self):
         """Return the unique id of the switch."""
-        entity_id = "{}.{}_{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid, SONOFF_SENSORS_MAP[self._sensor]['eid'])
-        return entity_id
+        unique_id = "{}.{}_{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid, SONOFF_SENSORS_MAP[self._sensor]['eid'])
+        return unique_id
 
     @property
     def icon(self):
