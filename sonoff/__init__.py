@@ -42,7 +42,7 @@ SONOFF_SENSORS_MAP = {
     'temperature'           : { 'eid' : 'temperature',  'uom' : TEMP_CELSIUS,   'icon' : 'mdi:thermometer' }
 }
 
-REQUIREMENTS        = ['uuid', 'websocket-client==0.54.0']
+REQUIREMENTS        = ['websocket-client==0.54.0']
 
 import websocket
 
