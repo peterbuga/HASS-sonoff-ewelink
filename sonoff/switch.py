@@ -1,8 +1,7 @@
-import logging, time, json
+import logging
 
-from homeassistant.components.switch import SwitchDevice
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.components.switch import DOMAIN
-# from homeassistant.components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 from custom_components.sonoff import (DOMAIN as SONOFF_DOMAIN, SonoffDevice)
 
 _LOGGER = logging.getLogger(__name__)
@@ -11,8 +10,15 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     """Add the Sonoff Switch entities"""
 
     entities = []
+
     for device in hass.data[SONOFF_DOMAIN].get_devices(force_update = True):
         outlets_number = hass.data[SONOFF_DOMAIN].get_outlets(device)
+
+        # @TODO figure out a better way to detect sonoff iFan02 (or probably iFan03)
+        # this entity will be split and picked up by `light` + `fan` entities
+        if hass.data[SONOFF_DOMAIN].device_type_by_uiid(device) and \
+            'FAN' in hass.data[SONOFF_DOMAIN].device_type_by_uiid(device):
+            continue
 
         if outlets_number is None: # fallback to whatever the device might have
             if 'switches' in device['params']: # the device has multiple switches, split them by outlets
@@ -20,7 +26,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                     entity = SonoffSwitch(hass, device, outlet['outlet'])
                     entities.append(entity)
 
-            elif 'switch' in device['params'] or 'state' in device['params']:
+            elif 'switch' in device['params']:
                 entity = SonoffSwitch(hass, device)
                 entities.append(entity)
 
@@ -30,18 +36,18 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 entities.append(entity)
 
         # normal device = Sonoff Basic (and alike)
-        elif 'switch' in device['params'] or 'state' in device['params']: #ignore devices like Sonoff RF bridge:
+        elif 'switch' in device['params']: #ignore devices like Sonoff RF bridge:
             entity = SonoffSwitch(hass, device)
             entities.append(entity)
 
-    if hass.data[SONOFF_DOMAIN].get_debug_state():
-        debug_entity = SonoffDebugSwitch(hass)
-        entities.append(debug_entity)
+    # if hass.data[SONOFF_DOMAIN].get_debug_state():
+    #     debug_entity = SonoffDebugSwitch(hass)
+    #     entities.append(debug_entity)
 
     if len(entities):
         async_add_entities(entities, update_before_add=False)
 
-class SonoffSwitch(SonoffDevice, SwitchDevice):
+class SonoffSwitch(SonoffDevice, SwitchEntity):
     """Representation of a Sonoff switch device."""
 
     def __init__(self, hass, device, outlet = None):
@@ -77,38 +83,45 @@ class SonoffSwitch(SonoffDevice, SwitchDevice):
 
     def turn_on(self, **kwargs):
         """Turn the device on."""
+        params = {'switch' : 'on'}
+        if self._outlet is not None:
+            params.update({'outlet' : self._outlet})
+
         self._hass.bus.async_fire('sonoff_state', {
-            'state'     : True,
             'deviceid'  : self._deviceid,
-            'outlet'    : self._outlet
+            'params'    : params
         })
         self.async_schedule_update_ha_state()
 
     def turn_off(self, **kwargs):
         """Turn the device off."""
+
+        params = {'switch' : 'off'}
+        if self._outlet is not None:
+            params.update({'outlet' : self._outlet})
+
         self._hass.bus.async_fire('sonoff_state', {
-            'state'     : False,
             'deviceid'  : self._deviceid,
-            'outlet'    : self._outlet
+            'params'    : params
         })
         self.async_schedule_update_ha_state()
 
     # entity id is required if the name use other characters not in ascii
     @property
-    def entity_id(self):
+    def unique_id(self):
         """Return the unique id of the switch."""
 
         if self._hass.data[SONOFF_DOMAIN].get_entity_prefix():
-            entity_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid)
+            unique_id = "{}.{}_{}".format(DOMAIN, SONOFF_DOMAIN, self._deviceid)
         else:
-            entity_id = "{}.{}".format(DOMAIN, self._deviceid)
+            unique_id = "{}.{}".format(DOMAIN, self._deviceid)
 
         if self._outlet is not None:
-            entity_id = "{}_{}".format(entity_id, str(self._outlet+1))
+            unique_id = "{}_{}".format(unique_id, str(self._outlet+1))
 
-        return entity_id
+        return unique_id
 
-class SonoffDebugSwitch(SwitchDevice):
+class SonoffDebugSwitch(SwitchEntity):
     def __init__(self, hass):
         self._hass = hass
 
